@@ -3,6 +3,7 @@
 *.m~
 *.asv~
 *.bak
+*.pdf
 
 # OS junk files
 .DS_Store
