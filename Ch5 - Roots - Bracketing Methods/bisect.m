@@ -1,6 +1,6 @@
-function [root,ea,iter] = bisect(func,x1,xu,es,maxit,varargin)
+function [root,relErr,iter] = bisect(func,x1,xu,es,maxit,varargin)
 %bisect: root location zeros
-% [root,ea,iter] = bisect(func,x1,xu,es,maxit,p1,p2,...)
+% [root,relErr,iter] = bisect(func,x1,xu,es,maxit,p1,p2,...)
 % input:
 %   func = function handle (@)
 %   x1, xu = lower and upper guesses
@@ -9,7 +9,7 @@ function [root,ea,iter] = bisect(func,x1,xu,es,maxit,varargin)
 %   p1,p2... = additional parameters used by func
 % output:
 %   root = real root
-%   ea = approximate relative error (%)
+%   relErr = approximate relative error (%)
 %   iter = number of iterations
 
 if nargin<3, error('at least 3 input arguments required'), end
@@ -26,16 +26,16 @@ while (1)
     xr_old = xr;
     xr = (x1+xu)/2;
     iter = iter + 1;
-    if xr ~= 0, ea = abs((xr - xr_old)/xr)*100; end
-    test = func(x1,varargin{:})*func(xu,varargin{:});
+    if xr ~= 0, relErr = abs((xr - xr_old)/xr)*100; end
+    test = func(x1,varargin{:})*func(xr,varargin{:});
     if test < 0
         xu = xr;
     elseif test > 0
         x1 = xr;
     else
-        ea = 0;
+        relErr = 0;
     end
-    if ea <= es || iter >= maxit, break, end
+    if relErr <= es || iter >= maxit, break, end
 end 
 root = xr;
 

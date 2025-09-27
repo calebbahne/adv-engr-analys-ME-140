@@ -2,7 +2,7 @@ function xb = incsearch(func,xmin,xmax,ns)
 % incsearch: incremental search root locator
 % xb = incsearch(func,xmin,xmax,ns):
 % finds brackets of x that contain sign changes
-%    of a function on an interval
+%    of a function on an interval. Just moves left -> right, slow
 % input:
 %   func = name of function
 %   xmin, xmax = endpoints of interval
@@ -20,10 +20,10 @@ x = linspace(xmin,xmax,ns);
 f = func(x);
 nb = 0; xb = []; %xb is null unless sign change detected
 for k = 1:length(x)-1
-if sign(f(k)) ~= sign(f(k+1)) %check for sign change
-nb = nb + 1;
-xb(nb,1) = x(k);
-xb(nb,2) = x(k+1);
+    if sign(f(k)) ~= sign(f(k+1)) %check for sign change
+    nb = nb + 1;
+    xb(nb,1) = x(k);
+    xb(nb,2) = x(k+1);
 end
 end
 
