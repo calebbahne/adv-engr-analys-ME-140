@@ -24,7 +24,7 @@ end
 if nargin < 4 || isempty(es),    es    = 0.0001; end   % desired error (%)
 if nargin < 5 || isempty(maxit), maxit = 50;     end
 
-iter = 0
+iter = 0;
 ea   = 100;
 xr   = xl;
 
@@ -33,7 +33,7 @@ while true
     fl = func(xl,varargin{:});
     fu = func(xu,varargin{:});
     xr = xu - fu*(xl - xu)/(fl - fu);   % false-position formula
-    iter = iter + 1
+    iter = iter + 1;
 
     if xr ~= 0
         ea = abs((xr - xrold)/xr) * 100;
