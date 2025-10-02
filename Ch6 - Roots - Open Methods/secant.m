@@ -1,5 +1,5 @@
 function xr=secant(f,x1,x2,tol,maxIt)
-%xr=secant(f,xL,xU,tol,maxIt)
+%xr=secant(f,x1,x2,tol,maxIt)
 %
 %Implements the Secant Method
 %
