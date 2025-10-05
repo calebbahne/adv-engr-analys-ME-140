@@ -1,14 +1,14 @@
-function xr=modSecant(f,x,delta,tol,maxIt)
+function xr=modSecant(f,x0,delta,tol,maxIt)
 %xr=modSecant(f,x,delta,tol,maxIt)
 %
 %Implements the modified secant method
 %
-%f is the function to find the root of
-%x is the initial value
-%delta is the value of delta
-%tol is the stopping criteria tolerance
-%maxIt is the maximum number of iterations
-%xr is the found root
+% f = function to find the root of
+% x0 = initial value
+% delta = value of delta
+% tol = stopping criteria tolerance
+% maxIt = maximum number of iterations
+% xr = found root
 %
 %ABH
 %Spring 2023
@@ -21,9 +21,9 @@ else
 maxIt=1e6;
 end
 for ii=1:maxIt
-xr=x-delta*x*f(x)/(f(x+delta*x)-f(x));
-if abs(1-x/xr)<tol
+xr=x0-delta*x0*f(x0)/(f(x0+delta*x0)-f(x0));
+if abs(1-x0/xr)<tol
 return
 end
-x=xr;
+x0=xr;
 end
