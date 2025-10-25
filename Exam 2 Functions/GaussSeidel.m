@@ -1,5 +1,5 @@
 function [x,ea,iter] = GaussSeidel(A,b,es,maxit)
-% GaussSeidel: Gauss Seidel method
+% GaussSeidel: Gauss Seidel method for solving a system of linear equations [A]{x}={b}
 % [x,ea,iter] = GaussSeidel(A,b,es,maxit): Gauss Seidel without relaxation
 % input:
 % A = coefficient matrix
@@ -11,6 +11,7 @@ function [x,ea,iter] = GaussSeidel(A,b,es,maxit)
 % ea = maximum relative error (%)
 % iter = number of iterations
 
+% Clarifying notes added prior to the exam: 
 % % GaussSeidel: Solves a system of linear equations [A]{x}={b} using the Gauss-Seidel iterative method.
 %
 % This function is suitable for solving systems that are large or sparse, where direct methods

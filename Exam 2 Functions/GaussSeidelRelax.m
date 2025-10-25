@@ -1,5 +1,5 @@
 function [x,ea,iter] = GaussSeidelRelax(A,b,lambda,es,maxit)
-% GaussSeidel: Gauss Seidel method with relaxation
+% GaussSeidelRelax: Gauss Seidel method with relaxation
 % [x,ea,iter] = GaussSeidelRelax(A,b,lambda,es,maxit): Gauss Seidel with relaxation
 % input:
 % A = coefficient matrix
@@ -12,6 +12,7 @@ function [x,ea,iter] = GaussSeidelRelax(A,b,lambda,es,maxit)
 % ea = maximum relative error (%)
 % iter = number of iterations
 
+% Additional notes (added before the exam):
 % GaussSeidelRelax: Solves a system of linear equations [A]{x}={b} using the
 %                   Gauss-Seidel method enhanced with a relaxation factor (lambda).
 %
