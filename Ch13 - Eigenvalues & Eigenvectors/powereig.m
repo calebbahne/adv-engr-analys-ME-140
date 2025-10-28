@@ -1,8 +1,8 @@
-function [eval, evect] = powereig(A, es, maxit)
+function [eigval, eigvect] = powereig(A, es, maxit)
 % powereig - Computes the dominant eigenvalue and eigenvector using the Power Method
 %
 % Syntax:
-%   [eval, evect] = powereig(A, es, maxit)
+%   [eigval, eigvect] = powereig(A, es, maxit)
 %
 % Inputs:
 %   A     - Square matrix for which the dominant eigenvalue/vector is sought
@@ -10,12 +10,12 @@ function [eval, evect] = powereig(A, es, maxit)
 %   maxit - Maximum number of iterations to perform
 %
 % Outputs:
-%   eval  - Dominant (largest magnitude) eigenvalue of A
-%   evect - Corresponding normalized eigenvector
+%   eigval  - Dominant (largest magnitude) eigenvalue of A
+%   eigvect - Corresponding normalized eigenvector
 %
 % Example:
 %   A = [4 1; 2 3];
-%   [eval, evect] = powereig(A, 0.0001, 100)
+%   [eigval, eigvect] = powereig(A, 0.0001, 100)
 %
 % Description:
 %   This function implements the Power Method, an iterative algorithm used 
@@ -24,22 +24,22 @@ function [eval, evect] = powereig(A, es, maxit)
 %   normalizes the result, and estimates convergence based on the change in eigenvalue.
 
     n = length(A);              % Determine the size of matrix A
-    evect = ones(n,1);          % Initialize eigenvector guess (all ones)
-    eval = 1;                   % Initial guess for eigenvalue
+    eigvect = ones(n,1);          % Initialize eigenvector guess (all ones)
+    eigval = 1;                   % Initial guess for eigenvalue
     iter = 0;                   % Iteration counter
     ea = 100;                   % Initialize approximate relative error (%)
 
     while (1)
-        evalold = eval;         % Save previous eigenvalue estimate
+        eigvalold = eigval;         % Save previous eigenvalue estimate
         
-        evect = A * evect;      % Multiply A by current eigenvector estimate
-        eval = max(abs(evect)); % Approximate new eigenvalue (dominant component)
-        evect = evect ./ eval;  % Normalize eigenvector
+        eigvect = A * eigvect;      % Multiply A by current eigenvector estimate
+        eigval = max(abs(eigvect)); % Approximate new eigenvalue (dominant component)
+        eigvect = eigvect ./ eigval;  % Normalize eigenvector
         
         iter = iter + 1;        % Increment iteration counter
         
-        if eval ~= 0
-            ea = abs((eval - evalold) / eval) * 100; % Compute approximate relative error
+        if eigval ~= 0
+            ea = abs((eigval - eigvalold) / eigval) * 100; % Compute approximate relative error
         end
         
         % Stop if error is below threshold or max iterations reached

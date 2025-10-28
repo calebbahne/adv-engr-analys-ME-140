@@ -1,6 +1,7 @@
 function [x,f,ea,iter]=newtmult(func,x0,es,maxit,varargin)
 % newtmult: Newton-Raphson root zeroes nonlinear systems
 % [x,f,ea,iter]=newtmult(func,x0,es,maxit,p1,p2,...):
+% [x,f,ea,iter]=newtmult(@jfreact2,x0); [have u&v w/ ftns]
 % uses the Newton-Raphson method to find the roots of
 % a system of nonlinear equations
 % input:
@@ -32,7 +33,7 @@ function [x,f,ea,iter]=newtmult(func,x0,es,maxit,varargin)
 %   p1,p2,... = optional additional parameters passed to the function 'func'.
 %
 % output:
-%   x = vector of calculated roots (the solution)
+%   x = vector of calculated roots (the solution) [columns are pairs]
 %   f = vector of functions evaluated at the final roots (should be close to zero)
 %   ea = final maximum approximate percent relative error (%), based on the change in x
 %   iter = number of iterations performed

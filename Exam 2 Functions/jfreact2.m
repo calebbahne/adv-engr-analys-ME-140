@@ -1,7 +1,7 @@
 function [J,f]=jfreact2(x,varargin)
 % jfreact2: Calculates the Jacobian matrix J and the function vector f
 %           for a system of two nonlinear equations, f1(x1, x2) and f2(x1, x2).
-%
+% Notes added prior to the exam:
 % NOTE: This specific implementation uses the finite-difference approximation
 %       for partial derivatives and assumes the system is defined by two
 %       external functions, u(x1, x2) and v(x1, x2), where f1=u and f2=v.
