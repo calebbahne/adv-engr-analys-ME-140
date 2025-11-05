@@ -174,9 +174,9 @@ switch convCase
 
                                 % Get Ra_L, Pr
                                 convType = 'Length'; % change
-                                T_K = getTemp();
-                                Ra_L = getRa();
-                                Pr = getPr(fluid, T_K);
+                                [Ra_L, T_s, T_inf] = getRa(fluid, convType);
+                                T_f = mean([T_s T_inf]);
+                                Pr = getPr(fluid, T_f);
                                 
                                 % Check precondit
                                 Nu_L = freeConvExtFlatPlateVert(Ra_L, Pr);
@@ -189,18 +189,20 @@ switch convCase
                                 if hotcold == 1
                                     clc;
                                     disp('Free conv, immersed, flat plate, hot surface up / cold surface down');
+                                    convType = 'Ra_L';
 
-                                    T_K = getTemp();
-                                    Ra_L = getRa();
-                                    Pr = getPr(fluid, T_K);
+                                    [Ra_L, T_s, T_inf] = getRa(fluid, convType);
+                                    T_f = mean([T_s T_inf]);
+                                    Pr = getPr(fluid, T_f);
                                     Nu_L = freeConvExtPlateHorizHotUpper(Ra_L,Pr);
                                 elseif hotcold == 2
                                     clc;
                                     disp('Free conv, immersed, flat plate, cold surface up / hot surface down');
+                                    convType = 'Ra_L';
 
-                                    T_K = getTemp();
-                                    Ra_L = getRa();
-                                    Pr = getPr(fluid, T_K);
+                                    [Ra_L, T_s, T_inf] = getRa(fluid, convType);
+                                    T_f = mean([T_s T_inf]);
+                                    Pr = getPr(fluid, T_f);
                                     Nu_L = freeConvExtPlateHorizHotLower(Ra_L,Pr);
                                 else
                                     clc;
@@ -217,9 +219,10 @@ switch convCase
                                     disp('Free conv, immersed, inclined plate, old surface up / hot surface down');
 
                                     theta = input('Inclination angle theta (deg):');
+                                    convType = 'Ra_L';
                                     %   Ra calc'd with g*cos(theta) *****
-                                    T_K = getTemp();
-                                    Ra_D = getRa();
+                                    [Ra_L, T_s, T_inf] = getRa(fluid, convType);
+                                    T_f = mean([T_s T_inf]);
                                     Pr = getPr(fluid, T_K);
 
                                     Nu_L = freeConvExtPlateInc(Ra_L,Pr,theta);
@@ -235,17 +238,20 @@ switch convCase
                     case 2
                         clc;
                         disp('Free conv, immersed, horizontal cylinder');
+                        convType = 'Ra_D';
                         
-                        T_K = getTemp();
-                        Ra_D = getRa();
-                        Pr = getPr(fluid, T_K);
+                        [Ra_D, T_s, T_inf] = getRa(fluid, convType);
+                        T_f = mean([T_s T_inf]);
+                        Pr = getPr(fluid, T_f);
                         Nu_D = freeConvExtHorizCyl(Ra_D,Pr);
                     case 3
                         clc;
                         disp('Free conv, immersed, sphere');
-
-                        T_K = getTemp();
-                        Ra_D = getRa();
+                        convType = 'Ra_D';
+                        
+                        [Ra_D, T_s, T_inf] = getRa(fluid, convType);
+                        T_f = mean([T_s T_inf]);
+                     
                         Pr = getPr(fluid, T_K);
                         
                         Nu_D = freeConvExtSphere(Ra_D,Pr);
@@ -420,9 +426,79 @@ else
 end
 end
 
-function Ra = getRa()
-% Gets Reynolds number
-Ra = input('Enter Rayleigh: ');
+function [Ra, T_s, T_inf] = getRa(fluid, ra_type)
+% getRa Calculate Rayleigh number using Grashof number
+%   [Ra, T_s, T_inf] = getRa(fluid, ra_type)
+%
+%   fluid   : 'air' or 'water'
+%   ra_type : 'Ra_D'/'D' (use diameter) or 'Ra_L'/'L' (use length)
+%
+%   Calculates: Ra = Gr * Pr
+%   where Gr = g * beta * (T_s - T_inf) * L^3 / (nu^2)
+%   and beta = 1 / T_K  (ideal gas approximation)
+%
+
+fluid = lower(string(fluid));
+ra_type = lower(string(ra_type));
+
+% Determine characteristic name for prompts
+if contains(ra_type, 'd')
+    charName = 'diameter (D)';
+else
+    charName = 'length (L)';
+end
+
+% Prompt user to select input method
+disp('Select Ra input method:');
+fprintf('   1. Compute from (%s)\n', charName);
+disp('   2. Direct input (Ra)');
+RaChoice = input('Ra input method: ');
+clc;
+
+if RaChoice == 2
+    Ra = input('Enter Rayleigh number (Ra): ');
+    return
+end
+clc;
+
+% Prompt for surface and ambient temperatures
+T_s = input('Enter surface temperature, T_s (C): ');
+T_inf = input('Enter ambient temperature, T_inf (C): ');
+
+T_s = T_s +273.15;
+T_inf = T_inf + 273.15;
+
+% Prompt for characteristic dimension
+L = input(sprintf('Enter characteristic %s (m): ', charName));
+
+clc;
+
+T_f = mean([T_s T_inf]);
+
+% Compute property values based on fluid type
+if fluid == "air"
+    nu = getAirProp(T_f, 'nu');       % m^2/s
+    alpha = getAirProp(T_f, 'alpha'); % m^2/s
+    Pr = getAirProp(T_f, 'pr');
+elseif fluid == "water"
+    nu = getWaterProp(T_f, 'nu');
+    alpha = getWaterProp(T_f, 'alpha');
+    Pr = getWaterProp(T_f, 'pr');
+else
+    error('Unknown fluid: use ''air'' or ''water''.');
+end
+
+% Constants
+g = 9.81;                  % gravitational acceleration (m/s^2)
+beta = 1 / T_f;            % thermal expansion coefficient (1/K)
+deltaT = T_s - T_inf;      % temperature difference
+
+% Compute Grashof number
+Gr = g * beta * deltaT * L^3 / (nu^2);
+
+% Compute Rayleigh number
+Ra = abs(Gr * Pr);
+
 end
 
 %% Forced External
@@ -522,7 +598,7 @@ function Nu_D = ExtConvTubeBank(Re_Dmax, Pr, Pr_s, tubeType, N_L, N_T, S_T, S_L)
 % Calc Re_Dmax
 %   Calc Vmax with S_T, D
 % Calc T_bar
-%   T_bar = mean(T_i, T_o)
+%   T_bar = mean([T_i T_o])
 % Calc dT_lm
 %   Need T_s, T_o, T_i
 % Calc C1 and C2
@@ -771,4 +847,5 @@ function val = getWaterProp(T_K, prop)
 %   val = interpolated value
 
 %Cesar
+% mirror the getAirProps ftn
 end
