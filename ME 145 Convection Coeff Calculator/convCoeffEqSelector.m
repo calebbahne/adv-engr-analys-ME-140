@@ -2,6 +2,14 @@
 % Purpose: Calculate the avg convection coefficient h for a given condition
 %   Determines the appropriate case, then does calcs from there.
 
+% To Do:
+%   - Characteristic length calculator for Ra
+%   - Print Ra or Re depending on case in show final results
+%   - Tube bank
+%   - Water properties
+%   - Other missing ones
+%   - Test and verify, put 'verified' on what's tested
+
 clc; clear;
 
 disp('Convection Coefficient Calculator');
@@ -390,7 +398,7 @@ fprintf('Density (rho):             %.4f kg/m³\n', rho);
 fprintf('Specific Heat (cp):        %.4e J/kg·K\n', cp);
 fprintf('Dynamic Viscosity (mu):    %.4e Pa·s\n', mu);
 fprintf('Kinematic Viscosity (nu):  %.4e Pa·s\n', nu);
-fprintf('Thermal Diffusivity:       %.4e m²/s\n', alpha);
+fprintf('Therm Diffusivity (alpha): %.4e m²/s\n', alpha);
 fprintf('Prandtl Number (Pr):       %.4f\n', Pr);
 
 fprintf('\n----------------------------------------\n');
@@ -520,7 +528,7 @@ end
 
 % Prompt user to select input method
 disp('Select Ra input method:');
-fprintf('   1. Compute from (%s)\n', charName);
+fprintf('   1. Compute from characteristic (%s)\n', charName);
 disp('   2. Direct input (Ra)');
 RaChoice = input('Ra input method: ');
 clc;
