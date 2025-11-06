@@ -42,7 +42,7 @@ switch convCase
                 %   gotta put here, making the code easier to interpret
 
                 T_K = getTemp(); % Tfilm
-                Re_L = getRe(T_K, fluid, 'Re_L');
+                [Re_L L] = getRe(T_K, fluid, 'Re_L');
                 Pr = getPr(fluid, T_K); % make sure it's T_f
 
                 [Nu_L, convType] = ExtConvFlatPlate(Re_L, Pr);
@@ -51,7 +51,7 @@ switch convCase
                 disp('External conv, cylinder');
 
                 T_K = getTemp(); % Tfilm
-                Re_D = getRe(T_K, fluid, 'Re_D');
+                [Re_D D]  = getRe(T_K, fluid, 'Re_D');
                 Pr = getPr(fluid, T_K); % make sure it's T_f
 
 
@@ -61,7 +61,7 @@ switch convCase
                 disp('External conv, sphere');
 
                 T_K = getTemp(); % T_inf
-                Re_D = getRe(T_K, fluid, 'Re_D');
+                [Re_D D]  = getRe(T_K, fluid, 'Re_D');
                 disp('***REMOVE*** Make sure its T_inf for Pr');
                 Pr = getPr(fluid, T_K); % make sure it's T_inf
                 mu = input('Dynamic viscosity (mu): ');
@@ -73,7 +73,7 @@ switch convCase
                 disp('External conv, Bank of tubes');
 
                 T_K = getTemp(); % Tfilm
-                Re_Dmax = getRe(T_K, fluid, 'Re_D');
+                [Re_Dmax D] = getRe(T_K, fluid, 'Re_D');
 
                 disp('***REMOVE*** Make sure its T_bar for Pr');
                 Pr = getPr(fluid, T_K); % make sure it's T_bar
@@ -174,7 +174,7 @@ switch convCase
 
                                 % Get Ra_L, Pr
                                 convType = 'Length'; % change
-                                [Ra_L, T_s, T_inf] = getRa(fluid, convType);
+                                [Ra_L, T_s, T_inf, T_f, L] = getRa(fluid, convType);
                                 T_f = mean([T_s T_inf]);
                                 Pr = getPr(fluid, T_f);
                                 
@@ -191,7 +191,7 @@ switch convCase
                                     disp('Free conv, immersed, flat plate, hot surface up / cold surface down');
                                     convType = 'Ra_L';
 
-                                    [Ra_L, T_s, T_inf] = getRa(fluid, convType);
+                                    [Ra_L, T_s, T_inf, T_f, L] = getRa(fluid, convType);
                                     T_f = mean([T_s T_inf]);
                                     Pr = getPr(fluid, T_f);
                                     Nu_L = freeConvExtPlateHorizHotUpper(Ra_L,Pr);
@@ -200,7 +200,7 @@ switch convCase
                                     disp('Free conv, immersed, flat plate, cold surface up / hot surface down');
                                     convType = 'Ra_L';
 
-                                    [Ra_L, T_s, T_inf] = getRa(fluid, convType);
+                                    [Ra_L, T_s, T_inf, T_f, L] = getRa(fluid, convType);
                                     T_f = mean([T_s T_inf]);
                                     Pr = getPr(fluid, T_f);
                                     Nu_L = freeConvExtPlateHorizHotLower(Ra_L,Pr);
@@ -221,7 +221,7 @@ switch convCase
                                     theta = input('Inclination angle theta (deg):');
                                     convType = 'Ra_L';
                                     %   Ra calc'd with g*cos(theta) *****
-                                    [Ra_L, T_s, T_inf] = getRa(fluid, convType);
+                                    [Ra_L, T_s, T_inf, T_f, L] = getRa(fluid, convType);
                                     T_f = mean([T_s T_inf]);
                                     Pr = getPr(fluid, T_K);
 
@@ -240,7 +240,7 @@ switch convCase
                         disp('Free conv, immersed, horizontal cylinder');
                         convType = 'Ra_D';
                         
-                        [Ra_D, T_s, T_inf] = getRa(fluid, convType);
+                        [Ra_D, T_s, T_inf, T_f, D] = getRa(fluid, convType);
                         T_f = mean([T_s T_inf]);
                         Pr = getPr(fluid, T_f);
                         Nu_D = freeConvExtHorizCyl(Ra_D,Pr);
@@ -249,7 +249,7 @@ switch convCase
                         disp('Free conv, immersed, sphere');
                         convType = 'Ra_D';
                         
-                        [Ra_D, T_s, T_inf] = getRa(fluid, convType);
+                        [Ra_D, T_s, T_inf, T_f, D] = getRa(fluid, convType);
                         T_f = mean([T_s T_inf]);
                      
                         Pr = getPr(fluid, T_K);
@@ -318,12 +318,82 @@ disp('Output the following:');
 disp('  Selected case type');
 disp('  Re, Pr, Ra, geometry stuff, Nu');
 disp('  h')
+disp('Have the user tell you what variables they want output to the screen?');
 
+%% Display results
 disp('----------------------------------');
 disp('Convection coefficient calculation complete');
 %disp('   We love you Troy, so please give us the A :)');
 disp('----------------------------------');
 
+% Shows the final values based on what exists
+% Lets the user say if they want all values or just a few
+
+if exist('Nu_L', 'var') && exist('L', 'var')
+    Nu = Nu_L;
+    charDim = L;
+elseif exist('Nu_D', 'var') && exist('D', 'var')
+    Nu = Nu_D;
+    charDim = D;
+else
+    error('Error: Neither (Nu_L, L) nor (Nu_D, D) found.');
+end
+
+if ~exist('T_f', 'var')
+    T_f = T_K; % happens if we have T_K and not T_f; a little clunky, change if time
+end
+
+% Get k based on fluid type
+switch lower(fluid)
+    case 'air'
+        k = getAirProp(T_f, 'k');
+    case 'water'
+        k = getWaterProp(T_f, 'k');
+    otherwise
+        error('Unknown fluid: %s. Must be "air" or "water".', fluid);
+end
+
+% Calculate convection coefficient **** This is the whole point
+h = Nu * k / charDim;
+
+clc;
+
+% Display main result
+fprintf('\n=== Convection Coefficient Results ===\n');
+fprintf('Fluid:                             %s\n', fluid);
+fprintf('Film Temperature (T_f):            %.2f K\n', T_f);
+fprintf('Characteristic Dimension (L or D): %.4f m\n', charDim);
+fprintf('Nusselt Number (Nu):               %.4f\n', Nu);
+fprintf('Thermal Conductivity (k):          %.4f W/m·K\n', k);
+fprintf('Convection Coefficient (h):        %.4f W/m²·K\n', h);
+
+switch lower(fluid)
+    case 'air'
+        rho   = getAirProp(T_f, 'rho');
+        cp    = getAirProp(T_f, 'cp');
+        mu    = getAirProp(T_f, 'mu');
+        nu    = getAirProp(T_f, 'nu');
+        alpha = getAirProp(T_f, 'alpha');
+        Pr    = getAirProp(T_f, 'Pr');
+    case 'water'
+        rho   = getWaterProp(T_f, 'rho');
+        cp    = getWaterProp(T_f, 'cp');
+        mu    = getWaterProp(T_f, 'mu');
+        nu    = getWaterProp(T_f, 'nu');
+        alpha = getWaterProp(T_f, 'alpha');
+        Pr    = getWaterProp(T_f, 'Pr');
+end
+
+% Display property table
+fprintf('\n\n--- %s Properties at %.2f K ---\n', upper(fluid), T_f);
+fprintf('Density (rho):             %.4f kg/m³\n', rho);
+fprintf('Specific Heat (cp):        %.4e J/kg·K\n', cp);
+fprintf('Dynamic Viscosity (mu):    %.4e Pa·s\n', mu);
+fprintf('Kinematic Viscosity (nu):  %.4e Pa·s\n', nu);
+fprintf('Thermal Diffusivity:       %.4e m²/s\n', alpha);
+fprintf('Prandtl Number (Pr):       %.4f\n', Pr);
+
+fprintf('\n----------------------------------------\n');
 
 %% Functions ============================================================
 
@@ -359,7 +429,7 @@ T_K = T_C+273.15;
 clc;
 end
 
-function Re = getRe(T_K, fluid, re_type)
+function [Re,charDim] = getRe(T_K, fluid, re_type)
 % getRe Calculate Reynolds number using nu
 %   Re = getRe(T_K, fluid, re_type)
 %
@@ -393,7 +463,7 @@ clc;
 
 % Otherwise compute from V and characteristic length
 V = input('Enter velocity V (m/s): ');
-L = input(sprintf('Enter characteristic %s (m): ', charName));
+charDim = input(sprintf('Enter characteristic %s (m): ', charName));
 
 clc;
 
@@ -407,7 +477,7 @@ else
 end
 
 % Compute Reynolds number
-Re = V * L / nu;
+Re = V * charDim / nu;
 end
 
 
@@ -426,7 +496,7 @@ else
 end
 end
 
-function [Ra, T_s, T_inf] = getRa(fluid, ra_type)
+function [Ra, T_s, T_inf, T_f, L] = getRa(fluid, ra_type)
 % getRa Calculate Rayleigh number using Grashof number
 %   [Ra, T_s, T_inf] = getRa(fluid, ra_type)
 %
@@ -624,29 +694,23 @@ end
 
 %% Free Convection
 
-% Vertical plate
+% Vertical plate - verified
 function Nu_L = freeConvExtFlatPlateVert(Ra_L, Pr)
 % Case: Free convection, external, vertical plate
-%   Ra_L >= 10^9  ---- Works for all Ra_L, but another better for laminar
+%   Ra_L >= 10^4  ---- Works for all Ra_L, but another better for laminar
 % Nu_L = freeConvExtFlatPlateVert(Ra_L, Pr)
 % Inputs:
 %   Ra_L, Pr
 % Outputs:
 %   Nu_L -- avg Nusselt
-
-Nu_L = (0.825+ 0.387*Ra_L.^(1/6) ./(1+ (0.492/Pr).^(9/16) ).^(8/27)) .^2; % verified
+if Ra_L <= 10^9 && Ra_L >= 10^4
+    Nu_L = 0.68 + 0.670*Ra_L.^(1/4)./ (1+(0.492/Pr).^(9/16)).^(4/9); % laminar, verified
+elseif Ra_L >= 10^9
+    Nu_L = (0.825+ 0.387*Ra_L.^(1/6) ./(1+ (0.492/Pr).^(9/16) ).^(8/27)) .^2; % verified
+else
+    Nu_L = [];
+    disp('Error in freeConvExtFlatPlateVert, Ra_L outside accepted range');
 end
-
-function Nu_L = freeConvExtFlatPlateVertLam(Ra_L, Pr)
-% Case: Free convection, external, vertical plate, laminar
-%   Ra_L <= 10^9  ---- Works better for laminar
-% Nu_L = freeConvExtVertPlate(Ra_L, Pr)
-% Inputs:
-%   Ra_L, Pr
-% Outputs:
-%   Nu_L
-
-Nu_L = 0.68 + 0.670*Ra_L.^(1/4)./ (1+(0.492/Pr).^(9/16)).^(4/9);
 end
 
 % Inclined plate
@@ -662,7 +726,7 @@ function Nu_L = freeConvExtPlateInc(Ra_L,Pr,theta)
 %   Nu_L
 
 if theta >= 0 && theta <= 60
-    Nu_L = freeConvExtFlatPlateVertLam(Ra_L, Pr); % use g*cos(theta) for Ra'
+    Nu_L = freeConvExtFlatPlateVert(Ra_L, Pr); % use g*cos(theta) for Ra' % should default to vert lam
 else
     disp('theta outside the range for an inclined plate. Consider using flat plate.')
 end
