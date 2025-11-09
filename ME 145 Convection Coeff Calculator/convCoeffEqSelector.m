@@ -72,7 +72,7 @@ switch convCase
                 [Re_D D]  = getRe(T_K, fluid, 'Re_D');
                 disp('***REMOVE*** Make sure its T_inf for Pr');
                 Pr = getPr(fluid, T_K); % make sure it's T_inf
-                mu = getAirProp(T_K, 'mu');
+                mu = getFluidProp(fluid, T_K, 'mu');
                 mu_s = input('Dynamic viscosity @ surface (mu_s):');
 
                 Nu_D = ExtConvSphere(Re_D, Pr, mu, mu_s);
@@ -80,9 +80,9 @@ switch convCase
                 clc;
                 disp('External conv, Bank of tubes');
 
-                [Nu_D, Re_Dmax, V_max, T_i, T_o, T_s, D, V, S_T, S_L, C1, C2, m, Pr_s, tubeType] = handleTubeBank(fluid);
+                [Nu_D, Re_Dmax, V_max, T_i, T_o, T_s, D, V, S_T, S_L, N_L, N_T, C1, C2, m, Pr_s, tubeType] = handleTubeBank(fluid);
                 Re_D = Re_Dmax; % for display at end??
-                T_f = (T_i+T_o)/2; % should be log mean? ****
+                T_f = (T_i+T_o)/2; % use T_i and T_o for Nu calcs
             otherwise
                 disp('Invalid selection.');
         end
@@ -324,15 +324,7 @@ if ~exist('T_f', 'var')
     T_f = T_K; % happens if we have T_K and not T_f; a little clunky, change if time ***
 end
 
-% Get k based on fluid type
-switch lower(fluid)
-    case 'air'
-        k = getAirProp(T_f, 'k');
-    case 'water'
-        k = getWaterProp(T_f, 'k');
-    otherwise
-        warndlg('Unknown fluid: %s. Must be "air" or "water".', fluid);
-end
+k = getFluidProp(fluid, T_f, 'k');
 
 % Calculate convection coefficient **** This is the whole point
 h = Nu * k / charDim;
@@ -348,22 +340,12 @@ fprintf('Nusselt Number (Nu):               %.4f\n', Nu);
 fprintf('Thermal Conductivity (k):          %.4f W/m·K\n', k);
 fprintf('Convection Coefficient (h):        %.4f W/m²·K\n', h);
 
-switch lower(fluid)
-    case 'air'
-        rho   = getAirProp(T_f, 'rho');
-        cp    = getAirProp(T_f, 'cp');
-        mu    = getAirProp(T_f, 'mu');
-        nu    = getAirProp(T_f, 'nu');
-        alpha = getAirProp(T_f, 'alpha');
-        Pr    = getAirProp(T_f, 'Pr');
-    case 'water'
-        rho   = getWaterProp(T_f, 'rho');
-        cp    = getWaterProp(T_f, 'cp');
-        mu    = getWaterProp(T_f, 'mu');
-        nu    = getWaterProp(T_f, 'nu');
-        alpha = getWaterProp(T_f, 'alpha');
-        Pr    = getWaterProp(T_f, 'Pr');
-end
+rho   = getFluidProp(fluid,T_f, 'rho');
+cp    = getFluidProp(fluid, T_f, 'cp');
+mu    = getFluidProp(fluid, T_f, 'mu');
+nu    = getFluidProp(fluid, T_f, 'nu');
+alpha = getFluidProp(fluid, T_f, 'alpha');
+Pr    = getFluidProp(fluid, T_f, 'Pr');
 
 % Display property table
 fprintf('\n\n--- %s Properties at %.2f K ---\n', upper(fluid), T_f);
@@ -447,14 +429,7 @@ charDim = input(sprintf('Enter characteristic %s (m): ', charName));
 
 clc;
 
-% Get kinematic viscosity from property functions
-if fluid == "air"
-    nu = getAirProp(T_K, 'nu');   % expects m^2/s
-elseif fluid == "water"
-    nu = getWaterProp(T_K, 'nu'); % expects m^2/s
-else
-    warndlg('Unknown fluid: use ''air'' or ''water''.');
-end
+nu = getFluidProp(fluid, T_K, 'nu');
 
 % Compute Reynolds number
 Re = V * charDim / nu;
@@ -467,13 +442,7 @@ function Pr = getPr(fluid, T_K)
 % fluid = 'air' or 'water'
 % T_K = temp of fluid
 
-if strcmpi(fluid, 'water')
-    Pr = getWaterProp(T_K, 'pr');
-elseif strcmpi(fluid, 'air')
-    Pr = getAirProp(T_K, 'pr');
-else
-    warndlg('Unknown fluid. Use ''water'' or ''air''.');
-end
+Pr = getFluidProp(fluid, T_K, 'pr');
 end
 
 function [Ra, T_s, T_inf, T_f, L] = getRa(fluid, ra_type)
@@ -525,18 +494,9 @@ clc;
 
 T_f = mean([T_s T_inf]);
 
-% Compute property values based on fluid type
-if fluid == "air"
-    nu = getAirProp(T_f, 'nu');       % m^2/s
-    alpha = getAirProp(T_f, 'alpha'); % m^2/s
-    Pr = getAirProp(T_f, 'pr');
-elseif fluid == "water"
-    nu = getWaterProp(T_f, 'nu');
-    alpha = getWaterProp(T_f, 'alpha');
-    Pr = getWaterProp(T_f, 'pr');
-else
-    warndlg('Unknown fluid: use ''air'' or ''water''.');
-end
+nu = getFluidProp(fluid, T_f, 'nu');
+alpha = getFluidProp(fluid, T_f, 'alpha');
+Pr = getFluidProp(fluid, T_f, 'pr');
 
 % Constants
 g = 9.81;                  % gravitational acceleration (m/s^2)
@@ -631,8 +591,84 @@ else
 end
 end
 
-%% Forced external, tube bank
-function [Nu_D, Re_Dmax, V_max, T_i, T_o, T_s, D, V, S_T, S_L, C1, C2, m, Pr_s, tubeType] = handleTubeBank(fluid)
+%% Forced external, tube 
+function [Nu_D, Re_Dmax, V_max, T_i, T_o, T_s, D, V, S_T, S_L, ...
+          N_L, N_T, C1, C2, m, Pr_s, tubeType, q_prime, DT_lm] = handleTubeBank(fluid)
+% handleTubeBank - does all the calcs for tube bank, including iteration,
+% finds log mean temp and q per unit length too
+
+[T_i, T_o, T_s, D, V, S_T, S_L, N_L, N_T, tubeType, assumedVar, tol] = getTubeBankInputs();
+T_f = mean([T_i, T_o]);
+rho = getFluidProp(fluid, T_f, 'rho');
+cp  = getFluidProp(fluid, T_f, 'cp');
+% ******* FINSHI
+maxIter = 50; iter = 0; converged = false;
+
+while ~converged && iter < maxIter
+    iter = iter + 1;
+
+    % Re and Nu
+    [Re_Dmax, V_max] = getReTubeBank(fluid, D, V, T_i, T_o, S_T, S_L, tubeType);
+    [Nu_D, C1, C2, m, Pr_s] = ExtConvTubeBank(fluid, Re_Dmax, T_i, T_o, T_s, S_T, S_L, N_L, tubeType);
+
+    % h-bar
+    k = getFluidProp(fluid, mean([T_i, T_o]), 'k');
+    h_bar = Nu_D * k / D;
+
+    % Calculate the temperature ratio from Eq (7.63)
+    expo = exp(-pi*D*N_L*h_bar / (rho*V*N_T*S_T*cp));
+
+    switch assumedVar
+        case 2  % assumed To
+            T_o_calc = T_s - (T_s - T_i) * expo;
+            err = abs((T_o_calc - T_o) / T_o) * 100;
+            if err <= tol
+                converged = true;
+            else
+                T_o = T_o + 0.5 * (T_o_calc - T_o);
+            end
+
+        case 3  % assumed Ti
+            T_i_calc = T_s - (T_s - T_o) / expo;
+            err = abs((T_i_calc - T_i) / T_i) * 100;
+            if err <= tol
+                converged = true;
+            else
+                T_i = T_i + 0.5 * (T_i_calc - T_i);
+            end
+
+        case 4  % assumed Ts
+            % rearrange Eq (7.63) → need iterative Ts guess
+            % (Ts - To)/(Ts - Ti) = exp(...)
+            % can solve via function f(Ts)=0
+            f = @(Ts_guess) (Ts_guess - T_o)/(Ts_guess - T_i) - exp(-pi*D*N_L*h_bar/(rho*V*N_T*S_T*cp));
+            Ts_new = T_s - 0.5 * f(T_s) * (T_s - mean([T_i, T_o]));
+            err = abs((Ts_new - T_s)/T_s)*100;
+            if err <= tol
+                converged = true;
+            else
+                T_s = Ts_new;
+            end
+
+        otherwise
+            converged = true;  % no assumed variable
+    end
+end
+
+% After convergence
+DT_lm = ((T_s - T_i) - (T_s - T_o)) / log((T_s - T_i)/(T_s - T_o));
+q_prime = N_T * (h_bar * pi * D * DT_lm);
+
+if converged
+    fprintf('\nConverged in %d iterations within %.2f%% tolerance.\n', iter, tol);
+else
+    warning('Did not converge within %d iterations.', maxIter);
+end
+
+end
+
+
+function [Nu_D, Re_Dmax, V_max, T_i, T_o, T_s, D, V, S_T, S_L, N_L, N_T, C1, C2, m, Pr_s, tubeType] = handleTubeBankOG(fluid)
 % handleTubeBank - does all the calcs for tube bank, including iteration
 
 [T_i, T_o, T_s, D, V, S_T, S_L, N_L, N_T, tubeType] = getTubeBankInputs();
@@ -643,6 +679,8 @@ function [Nu_D, Re_Dmax, V_max, T_i, T_o, T_s, D, V, S_T, S_L, C1, C2, m, Pr_s, 
 % solve for T_o given h
 %   check if within a tol (bc we're assuming T_o)
 %   Or***, have it set up in case we're guessing T_i or T_s too
+
+% can calc q', delP, delTlm
 
 end
 
@@ -711,14 +749,7 @@ fluid = lower(string(fluid));
 % We've gotta use film temp (not log mean)
 T_f = 0.5 * (T_i + T_o);  
 
-switch fluid
-    case "air"
-        nu = getAirProp(T_f, 'nu');  % m^2/s
-    case "water"
-        nu = getWaterProp(T_f, 'nu'); % m^2/s
-    otherwise
-        warndlg('Unknown fluid. Use ''air'' or ''water''.');
-end
+nu = getFluidProp(fluid, T_f, 'nu');
 
 % Get max velo
 if tubeType == 1 % aligned
@@ -756,15 +787,8 @@ function [Nu_D, C1, C2, m, Pr_s] = ExtConvTubeBank(fluid, Re_Dmax, T_i, T_o, T_s
 % Get film temps
 T_f = mean([T_i, T_o]);
 
-if strcmpi(fluid, 'air') % we should be std w/ strcmpi or the string method
-    Pr     = getAirProp(T_f, 'pr');
-    Pr_s   = getAirProp(T_s, 'pr');
-elseif strcmpi(fluid, 'water')
-    Pr     = getWaterProp(T_f, 'pr');
-    Pr_s   = getWaterProp(T_s, 'pr');
-else
-    warndlg('Unknown fluid. Use ''air'' or ''water''.');
-end
+Pr = getFluidProp(fluid, T_f, 'pr');
+Pr_s = getFluidProp(fluid, T_s, 'pr');
 
 % Find constants C1 and m from Table 7.5
 ST_SL = S_T / S_L;
@@ -937,7 +961,29 @@ else
 end
 end
 
-%% Interpolation Ftn
+%% Interpolation Ftns
+function val = getFluidProp(fluid, T_K, prop)
+% getFluidProp: picks the right fluid interpolation ftn
+% val = getFluidProp(T_K, fluid, prop)
+%
+% Inputs:
+%   T_K = temperature (K)
+%   fluid = 'air' or 'water'
+%   prop = property name ('rho', 'cp', 'mu', 'k', 'alpha', 'Pr', etc.)
+%
+% Output:
+%   val = interpolated property value
+
+    switch lower(fluid)
+        case 'air'
+            val = getAirProp(T_K, prop);
+        case 'water'
+            val = getWaterProp(T_K, prop);
+        otherwise
+            error('Fluid not recognized. Use ''air'' or ''water''.');
+    end
+end
+
 function val = getAirProp(T_K, prop)
 % getAirProp: interpolates property tables for air
 % val = getAirProp(T, prop)
