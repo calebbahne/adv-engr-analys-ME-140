@@ -72,7 +72,7 @@ switch convCase
                 [Re_D D]  = getRe(T_K, fluid, 'Re_D');
                 disp('***REMOVE*** Make sure its T_inf for Pr');
                 Pr = getPr(fluid, T_K); % make sure it's T_inf
-                mu = input('Dynamic viscosity (mu): ');
+                mu = getAirProp(T_K, 'mu');
                 mu_s = input('Dynamic viscosity @ surface (mu_s):');
 
                 Nu_D = ExtConvSphere(Re_D, Pr, mu, mu_s);
@@ -80,23 +80,9 @@ switch convCase
                 clc;
                 disp('External conv, Bank of tubes');
 
-                T_K = getTemp(); % Tfilm
-                [Re_Dmax D] = getRe(T_K, fluid, 'Re_D');
-
-                disp('***REMOVE*** Make sure its T_bar for Pr');
-                Pr = getPr(fluid, T_K); % make sure it's T_bar
-                disp('***REMOVE*** Make sure its T_s for Pr_s')
-                Pr_s = getPr(fluid, T_K); % make sure it's T_bar **** update to take in temp too
-
-                disp('Select a tube configuration:');
-                disp('  1. Aligned');
-                disp('  2. Staggered');
-                tubeType = input('Tube config: ');
-
-                N_L = input('Longitudinal pitch (N_L): ');
-                mu_s = input('Transverse pitch (N_T):');
-
-                Nu_D = ExtConvTubeBank(Re_Dmax, Pr, Pr_s, tubeType, N_L, N_T);
+                [Nu_D, Re_Dmax, V_max, T_i, T_o, T_s, D, V, S_T, S_L, C1, C2, m, Pr_s, tubeType] = handleTubeBank(fluid);
+                Re_D = Re_Dmax; % for display at end??
+                T_f = (T_i+T_o)/2; % should be log mean? ****
             otherwise
                 disp('Invalid selection.');
         end
@@ -315,19 +301,6 @@ switch convCase
         disp('Invalid main selection.');
 end
 
-disp(' ');
-disp('Get stuff for Re, Ra, Pr, etc.')
-disp('Calcs for Nu go here');
-disp('Then we calc h');
-% h = k*Nu_L/L;
-% h = k*Nu_D/D;
-disp(' ');
-disp('Output the following:');
-disp('  Selected case type');
-disp('  Re, Pr, Ra, geometry stuff, Nu');
-disp('  h')
-disp('Have the user tell you what variables they want output to the screen?');
-
 %% Display results
 disp('----------------------------------');
 disp('Convection coefficient calculation complete');
@@ -344,11 +317,11 @@ elseif exist('Nu_D', 'var') && exist('D', 'var')
     Nu = Nu_D;
     charDim = D;
 else
-    error('Error: Neither (Nu_L, L) nor (Nu_D, D) found.');
+    warndlg('Error: Neither (Nu_L, L) nor (Nu_D, D) found.');
 end
 
 if ~exist('T_f', 'var')
-    T_f = T_K; % happens if we have T_K and not T_f; a little clunky, change if time
+    T_f = T_K; % happens if we have T_K and not T_f; a little clunky, change if time ***
 end
 
 % Get k based on fluid type
@@ -358,7 +331,7 @@ switch lower(fluid)
     case 'water'
         k = getWaterProp(T_f, 'k');
     otherwise
-        error('Unknown fluid: %s. Must be "air" or "water".', fluid);
+        warndlg('Unknown fluid: %s. Must be "air" or "water".', fluid);
 end
 
 % Calculate convection coefficient **** This is the whole point
@@ -438,13 +411,12 @@ clc;
 end
 
 function [Re,charDim] = getRe(T_K, fluid, re_type)
-% getRe Calculate Reynolds number using nu
+% getRe:  Calculate Reynolds number using nu
 %   Re = getRe(T_K, fluid, re_type)
 %
-%   T_K     : temp in Kelvin
-%   fluid   : 'air' or 'water'
-%   re_type : 'Re_D'/'D' (use diameter) or 'Re_L'/'L' (use length)
-%
+%   T_K = temp in Kelvin
+%   fluid = 'air' or 'water'
+%   re_type = 'Re_D'/'D' (use diameter) or 'Re_L'/'L' (use length)
 
 fluid = lower(string(fluid)); % turns out format as str helps out
 re_type = lower(string(re_type)); % no need for strcompi
@@ -481,7 +453,7 @@ if fluid == "air"
 elseif fluid == "water"
     nu = getWaterProp(T_K, 'nu'); % expects m^2/s
 else
-    error('Unknown fluid: use ''air'' or ''water''.');
+    warndlg('Unknown fluid: use ''air'' or ''water''.');
 end
 
 % Compute Reynolds number
@@ -500,7 +472,7 @@ if strcmpi(fluid, 'water')
 elseif strcmpi(fluid, 'air')
     Pr = getAirProp(T_K, 'pr');
 else
-    error('Unknown fluid. Use ''water'' or ''air''.');
+    warndlg('Unknown fluid. Use ''water'' or ''air''.');
 end
 end
 
@@ -563,7 +535,7 @@ elseif fluid == "water"
     alpha = getWaterProp(T_f, 'alpha');
     Pr = getWaterProp(T_f, 'pr');
 else
-    error('Unknown fluid: use ''air'' or ''water''.');
+    warndlg('Unknown fluid: use ''air'' or ''water''.');
 end
 
 % Constants
@@ -603,10 +575,11 @@ elseif Re_L >= 5*10^5 && Re_L <= 10^8 && Pr >= 0.6 && Pr <= 60
     convType = 'mixed';
     Nu_L = (0.037*Re_L.^(4/5)-871) .*Pr.^(1/3);
 else
-    warning('Re_L or Pr outside acceptable range.');
-    warning('Make sure to use T_f for Pr.');
-    Nu_L = [];
+    Nu_L = NaN;
     convType = 'RE_OUTSIDE';
+    warndlg('Re_L or Pr outside acceptable range.'); 
+    % I found warndlg online: it pops up a GUI so we can find after fails
+    warndlg('Make sure to use T_f for Pr.');
 end
 end
 
@@ -628,7 +601,7 @@ if Re_D*Pr >= 0.2
 else
     disp('Re_D*Pr outside acceptable range.');
     disp('Make sure to use T_f for Pr.')
-    Nu_D = [];
+    Nu_D = NaN;
 end
 end
 
@@ -654,48 +627,197 @@ if Re_D <= 7.6e4 && Re_D >= 3.5 && Pr >= 0.71 && Pr <= 380 && mu/mu_s >= 1 && mu
 else
     disp('Re_D, Pr, or mu/mu_s outside acceptable range.');
     disp('Make sure to use T_f for Pr.')
-    Nu_D = [];
+    Nu_D = NaN;
 end
 end
 
-% Tube bank
-function Nu_D = ExtConvTubeBank(Re_Dmax, Pr, Pr_s, tubeType, N_L, N_T, S_T, S_L)
+%% Forced external, tube bank
+function [Nu_D, Re_Dmax, V_max, T_i, T_o, T_s, D, V, S_T, S_L, C1, C2, m, Pr_s, tubeType] = handleTubeBank(fluid)
+% handleTubeBank - does all the calcs for tube bank, including iteration
+
+[T_i, T_o, T_s, D, V, S_T, S_L, N_L, N_T, tubeType] = getTubeBankInputs();
+[Re_Dmax, V_max] = getReTubeBank(fluid, D, V, T_i, T_o, S_T, S_L, tubeType);
+[Nu_D, C1, C2, m, Pr_s] = ExtConvTubeBank(fluid, Re_Dmax, T_i, T_o, T_s, S_T, S_L, N_L, tubeType);
+
+% calc h
+% solve for T_o given h
+%   check if within a tol (bc we're assuming T_o)
+%   Or***, have it set up in case we're guessing T_i or T_s too
+
+end
+
+function [T_i, T_o, T_s, D, V, S_T, S_L, N_L, N_T, tubeType] = getTubeBankInputs()
+% getTubeBankInputs: get stuff for tube bank calcs
+% [T_i, T_o, T_s, D, S_T, S_L, tubeType] = getTubeBankInputs()
+% Outputs:
+%   T_i, T_o, T_s = inlet, outlet, and surface temperatures (K)
+%   D = tube diameter (m)
+%   S_T, S_L = transverse and longitudinal pitches (m)
+%   tubeType = 1 = Aligned, 2 = Staggered
+
+% Temperature inputs
+disp('Temperature:');
+T_i = input('  Enter fluid inlet temperature T_i (C): ');
+T_o = input('  Enter fluid outlet temperature T_o (C): ');
+T_s = input('  Enter tube surface temperature T_s (C): ');
+clc;
+
+T_i = T_i + 273.15; % convert to kelvin
+T_o = T_o + 273.15;
+T_s = T_s + 273.15;
+
+% Tube arrangement type
+disp('Select tube arrangement type:');
+disp('  1. Aligned');
+disp('  2. Staggered');
+tubeType = input('Arrangement: ');
+clc;
+
+% Geometry
+disp('Geometry:');
+D = input('  Enter tube outer diameter D (m): ');
+S_T = input('  Enter transverse pitch S_T (m): ');
+S_L = input('  Enter longitudinal pitch S_L (m): ');
+N_L = input('  Enter the rows of tubes (N_L): ');
+N_T = input('  Enter the columns of tubes (N_T): ');
+clc;
+V = input('Enter free stream velocity (m/s): ');
+clc;
+end
+
+function [Re_Dmax, V_max] = getReTubeBank(fluid, D, V, T_i, T_o, S_T, S_L, tubeType)
+% getReTubeBank: calculate Reynolds for tube bank
+%   [Re_Dmax, V_max] = getReTubeBank(fluid, D, V, T_i, T_o, T_s, S_T, S_L, tubeType
+% Inputs:
+%   fluid = 'air' or 'water'
+%   D = diam (m)
+%   V = free stream velo (m/s)
+%   T_i = inlet temp (K)
+%   T_o = outlet temp (K) (may be assumed?)
+%   T_s = surface temp (K)
+%   S_T = transverse pitch (m)
+%   S_L = longitudinal pitch (m)
+%   tubeType = 1 (aligned) or 2 (staggered)
+% Outputs:
+%   Re_Dmax = Reynolds number (based on max velo thru tube bank)
+%   V_max = max velo between tubes (m/s)
+%
+% Notes:
+%   Uses fluid properties at film temperature (T_f = (T_i + T_o) / 2)
+
+% just like getRe
+fluid = lower(string(fluid));
+
+% We've gotta use film temp (not log mean)
+T_f = 0.5 * (T_i + T_o);  
+
+switch fluid
+    case "air"
+        nu = getAirProp(T_f, 'nu');  % m^2/s
+    case "water"
+        nu = getWaterProp(T_f, 'nu'); % m^2/s
+    otherwise
+        warndlg('Unknown fluid. Use ''air'' or ''water''.');
+end
+
+% Get max velo
+if tubeType == 1 % aligned
+    V_max = V*S_T/(S_T-D);
+elseif tubeType == 2 % staggered
+    V_max = V*S_T*S_L/((S_T-D)*(0.5*S_L));
+else
+    warndlg('Unknown tube type (1 = aligned, 2 = staggered).');
+end
+
+Re_Dmax = V_max * D / nu;
+end
+
+function [Nu_D, C1, C2, m, Pr_s] = ExtConvTubeBank(fluid, Re_Dmax, T_i, T_o, T_s, S_T, S_L, N_L, tubeType)
 % Case: External convection, tube bank
+% Nu_D = ExtConvTubeBank(fluid, Re_Dmax, T_i, T_o, T_s, S_T, S_L, N_L, tubeType)
 %   10 <= Re_D <= 2e6
 %   0.7 <= Pr <= 500
 %   Use T_bar (need a calc)
-% Nu_D = ExtConvTubeBank(Re_Dmax, Pr, tubeType, N_L, N_T)
 % Inputs:
-%   Re_D, Pr, tubeType, N_L, N_T
+%   Re_D, Pr, tubeType
 %   tubeType = 1 (Aligned) or 2 (Staggered)
 %   N_L = longitudinal pitch
-%   N_T = transverse pitch
+%   fluid = 'air' or 'water'
+%   T_i = temp coming into the tube bank (K)
+%   T_o = temp coming out of the tube bank (K)
+%   S_T = transverse pitch (m)
+%   S_L = longitudinal pitch (m)
+%   N_L = number of rows
+%   V = velocity of free stream (m/s)
 % Outputs:
-%   Nu_D -- avg Nusselt
+%   Nu_D = avg Nusselt
+%   C1 & C2 = from table, for double checking
 
-% Calc Re_Dmax
-%   Calc Vmax with S_T, D
-% Calc T_bar
-%   T_bar = mean([T_i T_o])
-% Calc dT_lm
-%   Need T_s, T_o, T_i
-% Calc C1 and C2
-%   Switch statement to select C1 and m based on Re_Dmax & tubeType,
-%       S_T/S_L
-%   Calc C2 based on N_L
+% Get film temps
+T_f = mean([T_i, T_o]);
 
-disp('****INCOMPLETE');
-
-if Re_Dmax 
-    Nu_D = C1*C2*Re_Dmax.^(m).*Pr.^0.36.*(Pr./Pr_s).^(1/4);
+if strcmpi(fluid, 'air') % we should be std w/ strcmpi or the string method
+    Pr     = getAirProp(T_f, 'pr');
+    Pr_s   = getAirProp(T_s, 'pr');
+elseif strcmpi(fluid, 'water')
+    Pr     = getWaterProp(T_f, 'pr');
+    Pr_s   = getWaterProp(T_s, 'pr');
 else
-    disp('Re_D, Pr, or mu/mu_s outside acceptable range.');
-    disp('Make sure to use T_f for Pr.')
-    Nu_D = [];
+    warndlg('Unknown fluid. Use ''air'' or ''water''.');
 end
 
-% Can also output q' = N*h*pi*D*dT_lm
-% Can also calc pressure drop delP
+% Find constants C1 and m from Table 7.5
+ST_SL = S_T / S_L;
+
+if tubeType == 1  % Aligned
+    if Re_Dmax < 1e3
+        C1 = 0.8; m = 0.4;
+    elseif Re_Dmax < 2e5
+        C1 = 0.27; m = 0.63;
+    else
+        C1 = 0.021; m = 0.84;
+    end
+elseif tubeType == 2  % Staggered
+    if Re_Dmax < 1e3
+        C1 = 0.9; m = 0.4;
+    elseif Re_Dmax < 2e5
+        if ST_SL < 2
+            C1 = 0.35*(ST_SL)^(1/5); m = 0.6;
+        else
+            C1 = 0.4; m = 0.6;
+        end
+    else
+        C1 = 0.022; m = 0.84;
+    end
+else
+    warndlg('Invalid tube type (1 = aligned, 2 = staggered).');
+end
+
+% Interpolate correction factor C2 from Table 7.6 (use ch 18 interp1)
+NL_table = [1 2 3 4 5 7 10 13 16];
+if tubeType == 1
+    C2_table = [0.70 0.80 0.86 0.90 0.92 0.95 0.97 0.98 0.99];
+else
+    C2_table = [0.64 0.76 0.84 0.89 0.92 0.95 0.97 0.98 0.99];
+end
+
+if N_L < 1
+    warndlg('Error: longitudinal tube count < 1');
+    C2 = NaN;
+elseif N_L < 20
+    C2 = interp1(NL_table, C2_table, N_L, 'linear');
+    % we're using interp1 so we don't have to call polyint or another ftn
+else
+    C2 = 1;
+end
+
+% calc Nu_D
+if Re_Dmax >= 10 && Re_Dmax <= 2e6 && Pr >= 0.69 && Pr <= 500
+    Nu_D = C1*C2*Re_Dmax^m*Pr^0.36*(Pr/Pr_s)^(1/4);
+else
+    warndlg('Re_Dmax or Pr outside valid range.');
+    Nu_D = NaN;
+end
 end
 
 %% Forced Internal
@@ -716,8 +838,8 @@ if Ra_L <= 10^9 && Ra_L >= 10^4
 elseif Ra_L >= 10^9
     Nu_L = (0.825+ 0.387*Ra_L.^(1/6) ./(1+ (0.492/Pr).^(9/16) ).^(8/27)) .^2; % verified
 else
-    Nu_L = [];
-    disp('Error in freeConvExtFlatPlateVert, Ra_L outside accepted range');
+    Nu_L = NaN;
+    disp('warndlg in freeConvExtFlatPlateVert, Ra_L outside accepted range');
 end
 end
 
@@ -758,7 +880,7 @@ elseif Ra_L >= 10^7 && Ra_L <= 10^11
     Nu_L = 0.15*Ra_L.^(1/3);
 else
     disp('Invalid combination of Ra_L and Pr');
-    Nu_L = [];
+    Nu_L = NaN;
 end
 end
 
@@ -776,7 +898,7 @@ if Ra_L >= 10^4 && Ra_L <= 10^9 && Pr >= 0.7
     Nu_L = 0.52*Ra_L.^(1/5);
 else
     disp('Invalid combination of Ra_L and Pr');
-    Nu_L = [];
+    Nu_L = NaN;
 end
 end
 
@@ -793,7 +915,7 @@ if Ra_D <= 10^12
     Nu_D = (0.60 + 0.387*Ra_D.^(1/6) ./(1+(0.559/Pr).^(9/16)).^(8/27)).^2;
 else
     disp('Invalid combination of Ra_D and Pr');
-    Nu_D = [];
+    Nu_D = NaN;
 end
 end
 
@@ -811,7 +933,7 @@ if Ra_D <= 10^12 && Pr >= 0.7
     Nu_D = 2 + 0.589*Ra_D.^(1/4) ./(1+(0.469/Pr).^(9/16)).^(4/9);
 else
     disp('Invalid combination of Ra_D and Pr');
-    Nu_D = [];
+    Nu_D = NaN;
 end
 end
 
@@ -828,7 +950,7 @@ function val = getAirProp(T_K, prop)
 
 if T_K < 100 || T_K > 3000
     disp('Temperature outside acceptable range.');
-    val = [];
+    val = NaN;
     return;
 end
 
@@ -904,7 +1026,7 @@ switch lower(prop)
         val = interp1(T_air, Pr_air, T_K, 'pchip');
 
     otherwise
-        error('Property not recognized. Use: rho, mu, cp, or k.');
+        warndlg('Property not recognized. Use: rho, mu, cp, or k.');
 end
 end
 
