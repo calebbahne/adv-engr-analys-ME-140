@@ -80,7 +80,14 @@ switch convCase
                 clc;
                 disp('External conv, Bank of tubes');
 
-                [Nu_D, Re_Dmax, V_max, T_i, T_o, T_s, D, V, S_T, S_L, N_L, N_T, C1, C2, m, Pr_s, tubeType] = handleTubeBank(fluid);
+                [Nu_D, Re_Dmax, V_max, T_i, T_o, T_s, D, V, S_T, S_L, ...
+                    N_L, N_T, C1, C2, m, Pr_s, tubeType, q_p, DT_lm, iter, tol, converged] = handleTubeBank(fluid);
+                if converged
+                    fprintf('\nTube Bank calcs converged in %d iterations within %.2f%% tolerance.\n', iter, tol);
+                else
+                    warndlg('Tube Bank calcs did not converge.');
+                end
+
                 Re_D = Re_Dmax; % for display at end??
                 T_f = (T_i+T_o)/2; % use T_i and T_o for Nu calcs
             otherwise
@@ -537,7 +544,7 @@ elseif Re_L >= 5*10^5 && Re_L <= 10^8 && Pr >= 0.6 && Pr <= 60
 else
     Nu_L = NaN;
     convType = 'RE_OUTSIDE';
-    warndlg('Re_L or Pr outside acceptable range.'); 
+    warndlg(sprintf('Re_L or Pr outside acceptable range.\nRe_L = %.2e\nPr = %.3f', Re_L, Pr), 'Warning'); 
     % I found warndlg online: it pops up a GUI so we can find after fails
     warndlg('Make sure to use T_f for Pr.');
 end
@@ -593,7 +600,7 @@ end
 
 %% Forced external, tube 
 function [Nu_D, Re_Dmax, V_max, T_i, T_o, T_s, D, V, S_T, S_L, ...
-          N_L, N_T, C1, C2, m, Pr_s, tubeType, q_prime, DT_lm] = handleTubeBank(fluid)
+          N_L, N_T, C1, C2, m, Pr_s, tubeType, q_p, DT_lm, iter, tol, converged] = handleTubeBank(fluid)
 % handleTubeBank - does all the calcs for tube bank, including iteration,
 % finds log mean temp and q per unit length too
 
@@ -601,8 +608,8 @@ function [Nu_D, Re_Dmax, V_max, T_i, T_o, T_s, D, V, S_T, S_L, ...
 T_f = mean([T_i, T_o]);
 rho = getFluidProp(fluid, T_f, 'rho');
 cp  = getFluidProp(fluid, T_f, 'cp');
-% ******* FINSHI
-maxIter = 50; iter = 0; converged = false;
+
+maxIter = 1; iter = 0; converged = false;
 
 while ~converged && iter < maxIter
     iter = iter + 1;
@@ -610,16 +617,24 @@ while ~converged && iter < maxIter
     % Re and Nu
     [Re_Dmax, V_max] = getReTubeBank(fluid, D, V, T_i, T_o, S_T, S_L, tubeType);
     [Nu_D, C1, C2, m, Pr_s] = ExtConvTubeBank(fluid, Re_Dmax, T_i, T_o, T_s, S_T, S_L, N_L, tubeType);
+    
+    T_f = mean([T_i T_o]);
 
-    % h-bar
-    k = getFluidProp(fluid, mean([T_i, T_o]), 'k');
-    h_bar = Nu_D * k / D;
+    % h
+    k = getFluidProp(fluid, T_f, 'k');
+    h = Nu_D * k / D;
+    N = N_T*N_L;
 
-    % Calculate the temperature ratio from Eq (7.63)
-    expo = exp(-pi*D*N_L*h_bar / (rho*V*N_T*S_T*cp));
+    % Props
+    rho = getFluidProp(fluid, T_f, 'rho');
+    cp  = getFluidProp(fluid, T_f, 'cp');
 
-    switch assumedVar
-        case 2  % assumed To
+    % Calculate the temperature ratio
+    expo = exp(-pi*D*N*h / (rho*V*N_T*S_T*cp)); % exponent stuff
+
+    switch assumedVar % T_i, T_o
+        % case 1 = none assumed
+        case 2  % assumed T_o
             T_o_calc = T_s - (T_s - T_i) * expo;
             err = abs((T_o_calc - T_o) / T_o) * 100;
             if err <= tol
@@ -628,7 +643,7 @@ while ~converged && iter < maxIter
                 T_o = T_o + 0.5 * (T_o_calc - T_o);
             end
 
-        case 3  % assumed Ti
+        case 3  % assumed T_i
             T_i_calc = T_s - (T_s - T_o) / expo;
             err = abs((T_i_calc - T_i) / T_i) * 100;
             if err <= tol
@@ -637,54 +652,19 @@ while ~converged && iter < maxIter
                 T_i = T_i + 0.5 * (T_i_calc - T_i);
             end
 
-        case 4  % assumed Ts
-            % rearrange Eq (7.63) → need iterative Ts guess
-            % (Ts - To)/(Ts - Ti) = exp(...)
-            % can solve via function f(Ts)=0
-            f = @(Ts_guess) (Ts_guess - T_o)/(Ts_guess - T_i) - exp(-pi*D*N_L*h_bar/(rho*V*N_T*S_T*cp));
-            Ts_new = T_s - 0.5 * f(T_s) * (T_s - mean([T_i, T_o]));
-            err = abs((Ts_new - T_s)/T_s)*100;
-            if err <= tol
-                converged = true;
-            else
-                T_s = Ts_new;
-            end
-
         otherwise
             converged = true;  % no assumed variable
     end
 end
 
 % After convergence
-DT_lm = ((T_s - T_i) - (T_s - T_o)) / log((T_s - T_i)/(T_s - T_o));
-q_prime = N_T * (h_bar * pi * D * DT_lm);
-
-if converged
-    fprintf('\nConverged in %d iterations within %.2f%% tolerance.\n', iter, tol);
-else
-    warning('Did not converge within %d iterations.', maxIter);
-end
+DT_lm = ((T_s - T_i) - (T_s - T_o)) / log((T_s - T_i)/(T_s - T_o)); % log mean temp change
+q_p = N_T * (h * pi * D * DT_lm); % heat rate per unit length
+%***** Having real issues with convergence
 
 end
 
-
-function [Nu_D, Re_Dmax, V_max, T_i, T_o, T_s, D, V, S_T, S_L, N_L, N_T, C1, C2, m, Pr_s, tubeType] = handleTubeBankOG(fluid)
-% handleTubeBank - does all the calcs for tube bank, including iteration
-
-[T_i, T_o, T_s, D, V, S_T, S_L, N_L, N_T, tubeType] = getTubeBankInputs();
-[Re_Dmax, V_max] = getReTubeBank(fluid, D, V, T_i, T_o, S_T, S_L, tubeType);
-[Nu_D, C1, C2, m, Pr_s] = ExtConvTubeBank(fluid, Re_Dmax, T_i, T_o, T_s, S_T, S_L, N_L, tubeType);
-
-% calc h
-% solve for T_o given h
-%   check if within a tol (bc we're assuming T_o)
-%   Or***, have it set up in case we're guessing T_i or T_s too
-
-% can calc q', delP, delTlm
-
-end
-
-function [T_i, T_o, T_s, D, V, S_T, S_L, N_L, N_T, tubeType] = getTubeBankInputs()
+function [T_i, T_o, T_s, D, V, S_T, S_L, N_L, N_T, tubeType, assumedVar, tol] = getTubeBankInputs()
 % getTubeBankInputs: get stuff for tube bank calcs
 % [T_i, T_o, T_s, D, S_T, S_L, tubeType] = getTubeBankInputs()
 % Outputs:
@@ -703,6 +683,18 @@ clc;
 T_i = T_i + 273.15; % convert to kelvin
 T_o = T_o + 273.15;
 T_s = T_s + 273.15;
+
+disp('Was any temperature assumed?');
+disp('  1. None');
+disp('  2. Outlet temperature (T_o)');
+disp('  3. Inlet temperature (T_i)');
+assumedVar = input('Assumption: ');
+if assumedVar ~= 1
+    tol = input('Enter tolerance for iteration (percent): ');
+else
+    tol = NaN;
+end
+clc;
 
 % Tube arrangement type
 disp('Select tube arrangement type:');
@@ -836,11 +828,11 @@ else
 end
 
 % calc Nu_D
-if Re_Dmax >= 10 && Re_Dmax <= 2e6 && Pr >= 0.69 && Pr <= 500
+if Re_Dmax >= 10 && Re_Dmax <= 2e6 && Pr >= 0.68 && Pr <= 500 % really Pr >= .70, but some miss ok
     Nu_D = C1*C2*Re_Dmax^m*Pr^0.36*(Pr/Pr_s)^(1/4);
 else
-    warndlg('Re_Dmax or Pr outside valid range.');
-    Nu_D = NaN;
+    warndlg(sprintf('Re_Dmax or Pr not ok.\nRe_L = %.2e\nPr = %.3f', Re_Dmax, Pr), 'Warning');
+    Nu_D = C1*C2*Re_Dmax^m*Pr^0.36*(Pr/Pr_s)^(1/4);
 end
 end
 
@@ -863,7 +855,8 @@ elseif Ra_L >= 10^9
     Nu_L = (0.825+ 0.387*Ra_L.^(1/6) ./(1+ (0.492/Pr).^(9/16) ).^(8/27)) .^2; % verified
 else
     Nu_L = NaN;
-    disp('warndlg in freeConvExtFlatPlateVert, Ra_L outside accepted range');
+    warndlg(sprintf('Ra_L outside acceptable range.\nRe_L = %.2e\nPr = %.3f', Ra_L), 'Warning');
+    % found online for troubleshooting
 end
 end
 
