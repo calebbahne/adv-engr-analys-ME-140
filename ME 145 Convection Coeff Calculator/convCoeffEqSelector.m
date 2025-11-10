@@ -5,7 +5,7 @@
 % To Do:
 %   - Characteristic length calculator for Ra
 %   - Print Ra or Re depending on case in show final results
-%   - Tube bank
+%   - Tube bank verify 
 %   - Water properties
 %   - Other missing ones
 %   - Test and verify, put 'verified' on what's tested
@@ -1008,7 +1008,7 @@ rho_air = [3.5562 2.3364 1.7458 1.3947 1.1614 0.9950 0.8711 0.7740 0.6964 ...
 cp_air = [1.032 1.012 1.007 1.006 1.007 1.009 1.014 1.021 1.030 1.040 ...
       1.051 1.063 1.075 1.087 1.099 1.110 1.121 1.131 1.141 1.159 ...
       1.175 1.189 1.207 1.230 1.248 1.267 1.286 1.307 1.337 1.372 ...
-      1.417 1.478 1.558 1.665 2.726];                                   % Specific heat (kJ/kg·K)
+      1.417 1.478 1.558 1.665 2.726]*1000;                              % Specific heat (J/kg·K)
 
 mu_air = [71.1 103.4 132.5 159.6 184.6 208.2 230.1 250.7 270.1 288.4 305.8 ...
       322.5 338.8 354.6 369.8 384.3 398.1 411.3 424.4 449.0 473.0 496.0 ...
@@ -1079,6 +1079,75 @@ function val = getWaterProp(T_K, prop)
 % Output:
 %   val = interpolated value
 
-%Cesar
-% mirror the getAirProps ftn
+if T_K < 273.15 || T_K > 647.3
+    disp('Temperature outside acceptable range.');
+    val = [];
+    return;
+end
+
+% Temperature (K)
+T_water = [ ...
+ 273.15 275 280 285 290 295 300 305 310 315 320 325 330 335 340 ...
+ 345 350 355 360 365 370 373.15 380 400 420 440 460 480 500 520 ...
+ 540 560 580 600 620 640 647.3];
+
+% Specific volume (vf * 1e3) → will invert to rho
+vf_water_1e3 = [ ...
+ 1.000 1.000 1.000 1.000 1.001 1.001 1.003 1.003 1.007 1.012 1.011 ...
+ 1.013 1.016 1.017 1.013 1.024 1.032 1.030 1.030 1.038 1.041 1.043 ...
+ 1.049 1.058 1.088 1.110 1.137 1.152 1.184 1.244 1.294 1.392 1.433 ...
+ 1.541 1.770 2.197 2.110];
+
+% Specific heat (J/kg·K)
+cp_water = [ ...
+ 4.217 4.215 4.198 4.191 4.184 4.179 4.179 4.178 4.178 4.178 4.180 ...
+ 4.182 4.186 4.192 4.188 4.191 4.195 4.203 4.209 4.216 4.224 4.217 ...
+ 4.226 4.256 4.232 4.236 4.198 4.138 4.059 3.984 3.725 2.589 2.263 ...
+ 2.007 0.941 0.563 0.000]*1000;
+
+% Dynamic viscosity (μ_f * 1e6 Pa·s)
+mu_water_1e6 = [ ...
+ 1750 1654 1422 1225 1080 959 855 765 695 639 577 532 489 453 420 ...
+ 389 364 343 326 306 289 279 264 237 215 162 138 123 112 104 ...
+ 95 91 90 81 72 64 45];
+
+% Thermal conductivity (k_f * 1e3 W/m·K)
+k_water_1e3 = [ ...
+ 561 574 582 590 598 606 613 619 626 632 640 645 650 656 660 ...
+ 664 671 679 686 677 688 682 688 688 688 682 673 667 651 628 ...
+ 594 548 515 497 444 330 238];
+
+% Prandtl number (-)
+Pr_water = [ ...
+ 12.8 12.3 11.0 10.2 9.41 8.73 7.57 6.83 6.24 5.73 5.10 4.65 4.26 ...
+ 3.96 3.71 3.41 3.20 3.02 2.81 2.61 2.44 1.76 1.61 1.35 1.16 ...
+ 1.04 0.99 0.92 0.87 0.84 0.86 0.94 0.99 1.14 1.52 2.70 Inf];
+
+% --- Convert to SI
+vf_water   = vf_water_1e3 * 1e-3;        % m^3/kg
+rho_water  = 1 ./ vf_water;              % kg/m^3
+mu_water   = mu_water_1e6 * 1e-6;        % Pa·s
+k_water    = k_water_1e3  * 1e-3;        % W/m·K
+nu_water   = mu_water ./ rho_water;      % m^2/s
+alpha_water= k_water ./ (rho_water .* (cp_water*1000)); % m^2/s
+
+% Interpolate w/ interp1
+switch lower(prop)
+    case 'rho'
+        val = interp1(T_water, rho_water, T_K, 'pchip');
+    case 'mu'
+        val = interp1(T_water, mu_water, T_K, 'pchip');
+    case 'cp'
+        val = interp1(T_water, cp_water, T_K, 'pchip');   % J/kg·K
+    case 'k'
+        val = interp1(T_water, k_water, T_K, 'pchip');
+    case 'nu'
+        val = interp1(T_water, nu_water, T_K, 'pchip');
+    case 'alpha'
+        val = interp1(T_water, alpha_water, T_K, 'pchip');
+    case 'pr'
+        val = interp1(T_water, Pr_water,    T_K, 'pchip');
+    otherwise
+        error('Property not recognized. Use: rho, mu, cp, k, nu, alpha, pr.');
+end
 end
