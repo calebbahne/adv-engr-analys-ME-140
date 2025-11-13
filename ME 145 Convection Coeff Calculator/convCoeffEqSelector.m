@@ -426,6 +426,7 @@ clc;
 
 if ReChoice == 2
     Re = input('Enter Re: ');
+    charDim = input(sprintf('Enter characteristic %s (m): ', charName));
     return
 end
 clc;
