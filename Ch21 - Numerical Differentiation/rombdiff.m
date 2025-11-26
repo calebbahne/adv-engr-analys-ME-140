@@ -1,17 +1,16 @@
 function [d,ea,iter]=rombdiff(func,x,es,maxit,varargin)
 % romberg: Romberg integration quadrature
-% q = romberg(func,a,b,es,maxit,varargin):
-% [d,ea,iter]=rombdiff(func,x,es,maxit,varargin)
+%   [d,ea,iter]=rombdiff(func,x,es,maxit,varargin)
 % Romberg differentiation.
 % input:
-% func = name of function to be integrated
-% es = desired relative error (default = 0.000001%)
-% maxit = maximum allowable iterations (default = 50)
-% p1,p2,... = additional parameters used by func
+%   func = name of function to be integrated
+%   es = desired relative error (default = 0.000001%)
+%   maxit = maximum allowable iterations (default = 50)
+%   p1,p2,... = additional parameters used by func
 % output:
-% q = integral estimate
-% ea = approximate relative error (%)
-% iter = number of iterations
+%   d = integral estimate
+%   ea = approximate relative error (%)
+%   iter = number of iterations
 if nargin<2,error('at least 2 input arguments required'),end
 if nargin<3|isempty(es), es=0.000001;end
 if nargin<4|isempty(maxit), maxit=50;end
