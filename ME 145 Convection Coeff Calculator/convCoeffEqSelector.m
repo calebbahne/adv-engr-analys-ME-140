@@ -105,6 +105,7 @@ switch convCase
         switch intConvCase
             case 1 % Circular tube
                 clc;
+                % ****** REMOVE THIS PART
                 disp('Select a circular tube flow:');
                 disp('  1. Laminar flow');
                 disp('  2. Turbulent flow');
@@ -351,7 +352,6 @@ rho   = getFluidProp(fluid,T_f, 'rho');
 cp    = getFluidProp(fluid, T_f, 'cp');
 mu    = getFluidProp(fluid, T_f, 'mu');
 nu    = getFluidProp(fluid, T_f, 'nu');
-alpha = getFluidProp(fluid, T_f, 'alpha');
 Pr    = getFluidProp(fluid, T_f, 'Pr');
 
 % Display property table
@@ -360,7 +360,6 @@ fprintf('Density (rho):             %.4f kg/m³\n', rho);
 fprintf('Specific Heat (cp):        %.4e J/kg·K\n', cp);
 fprintf('Dynamic Viscosity (mu):    %.4e Pa·s\n', mu);
 fprintf('Kinematic Viscosity (nu):  %.4e Pa·s\n', nu);
-fprintf('Therm Diffusivity (alpha): %.4e m²/s\n', alpha);
 fprintf('Prandtl Number (Pr):       %.4f\n', Pr);
 
 fprintf('\n----------------------------------------\n');
@@ -503,7 +502,6 @@ clc;
 T_f = mean([T_s T_inf]);
 
 nu = getFluidProp(fluid, T_f, 'nu');
-alpha = getFluidProp(fluid, T_f, 'alpha');
 Pr = getFluidProp(fluid, T_f, 'pr');
 
 % Constants
@@ -963,7 +961,7 @@ function val = getFluidProp(fluid, T_K, prop)
 % Inputs:
 %   T_K = temperature (K)
 %   fluid = 'air' or 'water'
-%   prop = property name ('rho', 'cp', 'mu', 'k', 'alpha', 'Pr', etc.)
+%   prop = property name ('rho', 'cp', 'mu', 'k', 'Pr', etc.)
 %
 % Output:
 %   val = interpolated property value
@@ -984,12 +982,12 @@ function val = getAirProp(T_K, prop)
 % Inputs:
 %   T_K = temperature (K)
 %   prop = string property name to interpolate for
-%           rho, cp, mu, k, alpha, Pr
+%           rho, cp, mu, k, Pr
 % Output:
 %   val = interpolated value
 
 if T_K < 100 || T_K > 3000
-    disp('Temperature outside acceptable range.');
+    warning('Temperature outside acceptable range.');
     val = NaN;
     return;
 end
@@ -1025,11 +1023,6 @@ k_air = [9.34 13.8 18.1 22.3 26.3 30.0 33.8 37.3 40.7 43.9 46.9 49.7 52.4 ...
      54.9 57.3 59.6 62.0 64.3 66.7 71.5 76.3 82.0 91.0 100.0 106.0 ...
      113.0 120.0 128.0 137.0 147.0 160.0 175.0 196.0 222.0 486.0] * 1e-3; % Thermal conductivity (W/m·K)
 
-alpha_air = [2.54 5.84 10.3 15.9 22.5 29.9 38.3 47.2 56.7 66.7 76.9 87.3 ...
-          98.0 109.0 120.0 130.0 143.0 155.0 168.0 195.0 224.0 257.0 ...
-          303.0 350.0 390.0 435.0 482.0 534.0 589.0 646.0 714.0 783.0 ...
-          869.0 960.0 1570.0] * 1e-6;                                   % Thermal diffusivity (m^2/s)
-
 Pr_air = [0.786 0.758 0.737 0.720 0.707 0.700 0.690 0.686 0.684 0.683 ...
       0.685 0.690 0.695 0.702 0.709 0.716 0.720 0.723 0.726 0.728 ...
       0.728 0.719 0.703 0.685 0.688 0.685 0.683 0.677 0.672 0.667 ...
@@ -1057,10 +1050,6 @@ switch lower(prop)
         % Kinematic viscosity (m^2/s)
         val = interp1(T_air, nu_air, T_K, 'pchip');
 
-    case 'alpha'
-        % Thermal diffusivity (m^2/s)
-        val = interp1(T_air, alpha_air, T_K, 'pchip');
-
     case 'pr'
         % Prandtl number (-)
         val = interp1(T_air, Pr_air, T_K, 'pchip');
@@ -1076,7 +1065,7 @@ function val = getWaterProp(T_K, prop)
 % Inputs:
 %   T_K = temperature (K)
 %   prop = string property name to interpolate for
-%           rho, cp, mu, k, alpha, Pr
+%           rho, cp, mu, k, Pr
 % Output:
 %   val = interpolated value
 
@@ -1089,40 +1078,46 @@ end
 % Temperature (K)
 T_water = [ ...
  273.15 275 280 285 290 295 300 305 310 315 320 325 330 335 340 ...
- 345 350 355 360 365 370 373.15 380 400 420 440 460 480 500 520 ...
- 540 560 580 600 620 640 647.3];
+ 345 350 355 360 365 370 373.15 380 385 390 400 410 420 430 ...
+ 440 450 460 470 480 490 500 510 520 530 540 550 560 570 580 ...
+ 590 600 610 620 625 630 635 640 645 647.3];
 
 % Specific volume (vf * 1e3) → will invert to rho
 vf_water_1e3 = [ ...
- 1.000 1.000 1.000 1.000 1.001 1.001 1.003 1.003 1.007 1.012 1.011 ...
- 1.013 1.016 1.017 1.013 1.024 1.032 1.030 1.030 1.038 1.041 1.043 ...
- 1.049 1.058 1.088 1.110 1.137 1.152 1.184 1.244 1.294 1.392 1.433 ...
- 1.541 1.770 2.197 2.110];
+ 1.000 1.000 1.000 0.9994 0.9990 1.002 1.003 1.005 1.007 1.009 1.011 ...
+ 1.013 1.016 1.018 1.021 1.024 1.027 1.030 1.034 1.038 1.041 1.044 ...
+ 1.049 1.053 1.058 1.067 1.077 1.088 1.099 1.110 1.123 1.137 1.152 ...
+ 1.167 1.184 1.203 1.222 1.244 1.268 1.294 1.323 1.355 1.392 1.433 ...
+ 1.482 1.541 1.612 1.705 1.778 1.856 1.935 2.075 2.351 3.170];
 
-% Specific heat (J/kg·K)
+% Specific heat (kJ/kg·K) — kept in kJ/kg·K here and multiplied to J/kg·K below
 cp_water = [ ...
- 4.217 4.215 4.198 4.191 4.184 4.179 4.179 4.178 4.178 4.178 4.180 ...
- 4.182 4.186 4.192 4.188 4.191 4.195 4.203 4.209 4.216 4.224 4.217 ...
- 4.226 4.256 4.232 4.236 4.198 4.138 4.059 3.984 3.725 2.589 2.263 ...
- 2.007 0.941 0.563 0.000]*1000;
+ 4.217 4.211 4.198 4.189 4.184 4.181 4.179 4.178 4.178 4.179 4.180 ...
+ 4.182 4.184 4.186 4.188 4.191 4.195 4.199 4.203 4.209 4.214 4.217 ...
+ 4.220 4.232 4.239 4.256 4.273 4.302 4.331 4.360 4.400 4.440 4.480 ...
+ 4.530 4.590 4.660 4.740 4.840 4.950 5.080 5.240 5.430 5.680 6.000 ...
+ 6.410 7.000 7.850 9.350 10.600 12.600 16.400 26.000 90.000 Inf] * 1000; 
 
 % Dynamic viscosity (μ_f * 1e6 Pa·s)
 mu_water_1e6 = [ ...
- 1750 1654 1422 1225 1080 959 855 765 695 639 577 532 489 453 420 ...
- 389 364 343 326 306 289 279 264 237 215 162 138 123 112 104 ...
- 95 91 90 81 72 64 45];
+ 1750 1652 1422 1225 1080 959 855 769 695 631 577 528 489 453 420 ...
+ 389 365 343 324 306 289 279 260 248 237 217 200 185 173 162 152 ...
+ 143 136 129 124 118 113 108 104 101 97 94 91 88 84 81 77 72 ...
+ 70 67 64 59 54 45];
 
-% Thermal conductivity (k_f * 1e3 W/m·K)
+% Thermal conductivity (k_f * 1e3 W/m·K) % change****
 k_water_1e3 = [ ...
- 561 574 582 590 598 606 613 619 626 632 640 645 650 656 660 ...
- 664 671 679 686 677 688 682 688 688 688 682 673 667 651 628 ...
- 594 548 515 497 444 330 238];
+ 569 574 582 590 598 606 613 620 628 634 640 645 650 656 660 ...
+ 664 668 671 674 677 679 681 683 685 686 688 688 688 685 682 ...
+ 678 673 667 660 651 642 631 621 608 594 580 563 548 528 513 ...
+ 497 467 444 430 412 392 367 331 238];
 
 % Prandtl number (-)
 Pr_water = [ ...
- 12.8 12.3 11.0 10.2 9.41 8.73 7.57 6.83 6.24 5.73 5.10 4.65 4.26 ...
- 3.96 3.71 3.41 3.20 3.02 2.81 2.61 2.44 1.76 1.61 1.35 1.16 ...
- 1.04 0.99 0.92 0.87 0.84 0.86 0.94 0.99 1.14 1.52 2.70 Inf];
+ 12.99 12.22 10.26 8.81 7.56 6.62 5.83 5.20 4.62 4.16 3.77 3.42 3.15 ...
+ 2.88 2.66 2.45 2.29 2.14 2.02 1.91 1.80 1.76 1.70 1.61 1.53 1.47 1.34 ...
+ 1.24 1.09 1.04 1.12 0.99 1.14 0.95 0.92 0.86 0.85 0.84 0.85 0.86 0.87 ...
+ 0.90 0.94 0.99 1.05 1.14 1.30 1.52 1.65 2.00 2.70 4.20 12.00 Inf];
 
 % --- Convert to SI
 vf_water   = vf_water_1e3 * 1e-3;        % m^3/kg
@@ -1130,7 +1125,6 @@ rho_water  = 1 ./ vf_water;              % kg/m^3
 mu_water   = mu_water_1e6 * 1e-6;        % Pa·s
 k_water    = k_water_1e3  * 1e-3;        % W/m·K
 nu_water   = mu_water ./ rho_water;      % m^2/s
-alpha_water= k_water ./ (rho_water .* (cp_water*1000)); % m^2/s
 
 % Interpolate w/ interp1
 switch lower(prop)
@@ -1144,11 +1138,9 @@ switch lower(prop)
         val = interp1(T_water, k_water, T_K, 'pchip');
     case 'nu'
         val = interp1(T_water, nu_water, T_K, 'pchip');
-    case 'alpha'
-        val = interp1(T_water, alpha_water, T_K, 'pchip');
     case 'pr'
-        val = interp1(T_water, Pr_water,    T_K, 'pchip');
+        val = interp1(T_water, Pr_water, T_K, 'pchip');
     otherwise
-        error('Property not recognized. Use: rho, mu, cp, k, nu, alpha, pr.');
+        error('Property not recognized. Use: rho, mu, cp, k, nu, pr.');
 end
 end
