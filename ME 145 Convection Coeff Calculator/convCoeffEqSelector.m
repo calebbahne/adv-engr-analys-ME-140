@@ -81,7 +81,7 @@ switch convCase
                 disp('External conv, Bank of tubes');
 
                 [Nu_D, Re_Dmax, V_max, T_i, T_o, T_s, D, V, S_T, S_L, ...
-                    N_L, N_T, C1, C2, m, Pr_s, tubeType, q_p, DT_lm, iter, tol, converged] = handleTubeBank(fluid);
+                    N_L, N_T, C1, C2, m, Pr_s, tubeType, q_p, DT_lm, iter, tol, converged, T_calc_hist, T_update_hist] = handleTubeBank(fluid);
                 if converged
                     fprintf('\nTube Bank calcs converged in %d iterations within %.2f%% tolerance.\n', iter, tol);
                 else
@@ -321,9 +321,11 @@ disp('----------------------------------');
 if exist('Nu_L', 'var') && exist('L', 'var')
     Nu = Nu_L;
     charDim = L;
+    Re_end = Re_L;
 elseif exist('Nu_D', 'var') && exist('D', 'var')
     Nu = Nu_D;
     charDim = D;
+    Re_end = Re_D;
 else
     warndlg('Error: Neither (Nu_L, L) nor (Nu_D, D) found.');
 end
@@ -339,16 +341,7 @@ h = Nu * k / charDim;
 
 clc;
 
-% Display main result
-fprintf('\n=== Convection Coefficient Results ===\n');
-fprintf('Fluid:                             %s\n', fluid);
-fprintf('Film Temperature (T_f):            %.2f K\n', T_f);
-fprintf('Characteristic Dimension (L or D): %.4f m\n', charDim);
-fprintf('Nusselt Number (Nu):               %.4f\n', Nu);
-fprintf('Thermal Conductivity (k):          %.4f W/m·K\n', k);
-fprintf('Convection Coefficient (h):        %.4f W/m²·K\n', h);
-
-rho   = getFluidProp(fluid,T_f, 'rho');
+rho   = getFluidProp(fluid, T_f, 'rho');
 cp    = getFluidProp(fluid, T_f, 'cp');
 mu    = getFluidProp(fluid, T_f, 'mu');
 nu    = getFluidProp(fluid, T_f, 'nu');
@@ -360,9 +353,19 @@ fprintf('Density (rho):             %.4f kg/m³\n', rho);
 fprintf('Specific Heat (cp):        %.4e J/kg·K\n', cp);
 fprintf('Dynamic Viscosity (mu):    %.4e Pa·s\n', mu);
 fprintf('Kinematic Viscosity (nu):  %.4e Pa·s\n', nu);
+fprintf('Thermal Conductivity (k):  %.4f W/m·K\n', k);
 fprintf('Prandtl Number (Pr):       %.4f\n', Pr);
 
 fprintf('\n----------------------------------------\n');
+
+% Display main result
+fprintf('\n=== Convection Coefficient Results ===\n');
+fprintf('Fluid:                             %s\n', fluid);
+fprintf('Film Temperature (T_f):            %.2f C\n', T_f-273.15);
+fprintf('Characteristic Dimension (L or D): %.4f m\n', charDim);
+fprintf('Reynolds Number (Re):              %d \n',Re_end);
+fprintf('Nusselt Number (Nu):               %.4f\n', Nu);
+fprintf('Convection Coefficient (h):        %.4f W/m²·K\n', h);
 
 %% Functions ============================================================
 
@@ -385,7 +388,7 @@ switch fluidSelect
         fluid = 'water';
     otherwise
         fluid = 'air';
-        warning('Invalid entry. Air is autoselected');
+        warndlg('Invalid entry. Air is autoselected');
 end
 end
 
@@ -599,7 +602,7 @@ end
 
 %% Forced external, tube 
 function [Nu_D, Re_Dmax, V_max, T_i, T_o, T_s, D, V, S_T, S_L, ...
-          N_L, N_T, C1, C2, m, Pr_s, tubeType, q_p, DT_lm, iter, tol, converged] = handleTubeBank(fluid)
+          N_L, N_T, C1, C2, m, Pr_s, tubeType, q_p, DT_lm, iter, tol, converged, T_calc_hist, T_update_hist] = handleTubeBank(fluid)
 % handleTubeBank - does all the calcs for tube bank, including iteration,
 % finds log mean temp and q per unit length too
 
@@ -608,7 +611,9 @@ T_f = mean([T_i, T_o]);
 rho = getFluidProp(fluid, T_f, 'rho');
 cp  = getFluidProp(fluid, T_f, 'cp');
 
-maxIter = 1; iter = 0; converged = false;
+maxIter = 50; iter = 0; converged = false;
+T_calc_hist = [];     % stores T_o_calc or T_i_calc
+T_update_hist = [];   % stores updated T_o or T_i
 
 while ~converged && iter < maxIter
     iter = iter + 1;
@@ -634,21 +639,31 @@ while ~converged && iter < maxIter
     switch assumedVar % T_i, T_o
         % case 1 = none assumed
         case 2  % assumed T_o
-            T_o_calc = T_s - (T_s - T_i) * expo;
+            T_o_calc = T_s - (T_s - T_i) * expo
+
+            % Save iteration data
+            T_calc_hist(end+1)   = T_o_calc-273.15;
+            T_update_hist(end+1) = T_o-273.15;
+
             err = abs((T_o_calc - T_o) / T_o) * 100;
             if err <= tol
                 converged = true;
             else
-                T_o = T_o + 0.5 * (T_o_calc - T_o);
+                T_o = T_o + 0.5 * (T_o_calc - T_o)
             end
 
         case 3  % assumed T_i
             T_i_calc = T_s - (T_s - T_o) / expo;
+
+            % Save iteration data
+            T_calc_hist(end+1)   = T_i_calc-273.15;
+            T_update_hist(end+1) = T_i-273.15;
+
             err = abs((T_i_calc - T_i) / T_i) * 100;
             if err <= tol
                 converged = true;
             else
-                T_i = T_i + 0.5 * (T_i_calc - T_i);
+                T_i = T_i + 0.5 * (T_i_calc - T_i)
             end
 
         otherwise
@@ -657,9 +672,8 @@ while ~converged && iter < maxIter
 end
 
 % After convergence
-DT_lm = ((T_s - T_i) - (T_s - T_o)) / log((T_s - T_i)/(T_s - T_o)); % log mean temp change
-q_p = N_T * (h * pi * D * DT_lm); % heat rate per unit length
-%***** Having real issues with convergence
+DT_lm = ((T_s-T_i)-(T_s-T_o))/log((T_s-T_i)/(T_s-T_o)); % log mean temp change
+q_p = N_T*N_L*(h*pi*D*DT_lm); % heat rate per unit length
 
 end
 
@@ -708,7 +722,7 @@ D = input('  Enter tube outer diameter D (m): ');
 S_T = input('  Enter transverse pitch S_T (m): ');
 S_L = input('  Enter longitudinal pitch S_L (m): ');
 N_L = input('  Enter the rows of tubes (N_L): ');
-N_T = input('  Enter the columns of tubes (N_T): ');
+N_T = input('  Enter the number of tubes per row: (N_T): ');
 clc;
 V = input('Enter free stream velocity (m/s): ');
 clc;
@@ -742,11 +756,15 @@ T_f = 0.5 * (T_i + T_o);
 
 nu = getFluidProp(fluid, T_f, 'nu');
 
+S_D = (S_L^2+(S_T/2)^2)^0.5;
+
 % Get max velo
 if tubeType == 1 % aligned
     V_max = V*S_T/(S_T-D);
-elseif tubeType == 2 % staggered
-    V_max = V*S_T*S_L/((S_T-D)*(0.5*S_L));
+elseif tubeType == 2 && S_D < (S_T+D)/2% staggered, A1
+    V_max = V*S_T/(2*(S_T-D));
+elseif tubeType == 2 && 2*(S_D-D) >= (S_T-D)/2% staggered, A2
+    V_max = V*S_T/(S_T-D);
 else
     warndlg('Unknown tube type (1 = aligned, 2 = staggered).');
 end
@@ -871,7 +889,7 @@ end
 %   convType = 'turbulent';
 %       Nu_D=5.0+0.025*(Re_D.*Pr).^(0.8)
 %else
-%    warning('Re_L or Pr outside acceptable range.');
+%    warndlg('Re_L or Pr outside acceptable range.');
 %    convType = 'RE_OUTSIDE';
 %end
 %end
@@ -885,8 +903,8 @@ end
 %    convType = 'mixed';
 %    Nu_L = (0.037*Re_L.^(4/5)-871) .*Pr.^(1/3);
 %else
-%    warning('Re_L or Pr outside acceptable range.');
-%    warning('Make sure to use T_f for Pr.');
+%    warndlg('Re_L or Pr outside acceptable range.');
+%    warndlg('Make sure to use T_f for Pr.');
 %    Nu_L = [];
 %    convType = 'RE_OUTSIDE';
 %end
@@ -1042,7 +1060,7 @@ function val = getAirProp(T_K, prop)
 %   val = interpolated value
 
 if T_K < 100 || T_K > 3000
-    warning('Temperature outside acceptable range.');
+    warndlg('Temperature outside acceptable range.');
     val = NaN;
     return;
 end
