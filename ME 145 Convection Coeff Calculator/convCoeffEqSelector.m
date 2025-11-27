@@ -836,6 +836,61 @@ end
 end
 
 %% Forced Internal
+%Flow in a circular tube [Chapter 8]
+% Case: External convection, flat plate
+
+%function [Nu_D, convType, f] = IntCircularTube(Re_D, Pr, G_zd, e, D, mu, mus, Ts, Tm)
+
+%QUESTION HOW DO I INCORPORATE Nu = 3.66 ALSO is G_zd necessary and Ts Tm?
+%Feels like the function has TOO MANY INPUT VARIABLES
+
+%if Re_D <= 2300 && Pr >= 0.5
+%   convType = 'laminar'; 
+%       Nu_D=3.66+(0.0668*G_zd)./(1+0.04*G_zd.^(2/3)); %has thermal entry
+%elseif Re_L >= 2300 && Pr >= 0.1 
+%   convType = 'laminar';
+%       %Nu_D=((3.66/tanh(2.264*G_zd.^(-1/3)+1.7*G_zd.^(-2/3))+0.0499*G_zd.*tanh(G_zd.^(-1)))./(tanh(2.432*Pr.^(1/6).*G_zd.^(-1/6))
+%       %has combined entry
+%elseif Re_D >= 10000 && 0.6 <= Pr <= 160 && L_D>10 && Ts > Tm
+%   convType = 'turbulent';
+%       Nu_D=(0.023*Re_D.^(4/5).*Pr.^(0.3))
+
+        %HOW DO I INCORPORATE THE N=0.3 OR N=0.4 CONDITIONS AND THE
+        %How do I account for the overlap in Pr
+
+%elseif Re_D >= 10000 && 0.6 <= Pr <= 160 && L_D>10 && Ts < Tm
+%   convType = 'turbulent';
+%       Nu_D=(0.023*Re_D.^(4/5).*Pr.^(0.4))
+%elseif Re_D>=10000 %% L_D>10 && 0.7<=Pr<=16700
+%   convType = 'turbulent';
+%       %Nu_D=(0.027*Re.^(4/5).*Pr.^(1/3).*(mu./mus).^(0.14)
+%%else if 3600 <= Re_D <= 905000 && 0.003 <= Pr <= 0.05 && 100 <= Re_D*Pr <= 10000
+%   convType = 'turbulent';
+%       Nu_D=4.82+0.0185*(Re_D.*Pr).^(0.827)
+%else if Re_D*Pr >= 100
+%   convType = 'turbulent';
+%       Nu_D=5.0+0.025*(Re_D.*Pr).^(0.8)
+%else
+%    warning('Re_L or Pr outside acceptable range.');
+%    convType = 'RE_OUTSIDE';
+%end
+%end
+
+
+%Sample code of Calebs that I used for reference
+%if Re_L <= 5*10^5 && Pr >= 0.6
+%    convType = 'laminar';
+ %   Nu_L = 0.664*Re_L.^(1/2)*Pr.^(1/3);
+%elseif Re_L >= 5*10^5 && Re_L <= 10^8 && Pr >= 0.6 && Pr <= 60
+%    convType = 'mixed';
+%    Nu_L = (0.037*Re_L.^(4/5)-871) .*Pr.^(1/3);
+%else
+%    warning('Re_L or Pr outside acceptable range.');
+%    warning('Make sure to use T_f for Pr.');
+%    Nu_L = [];
+%    convType = 'RE_OUTSIDE';
+%end
+%end
 
 %% Free Convection
 
