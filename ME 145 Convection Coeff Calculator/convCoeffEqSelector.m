@@ -58,7 +58,11 @@ switch convCase
                 clc;
                 disp('External conv, cylinder');
 
-                T_K = getTemp(); % Tfilm
+                T_inf = input('Enter the Upstream Fluid Temperature (C): ')+273.15;
+                T_s = input('Enter the Surface Temperature (C): ')+273.15;
+                T_K = (T_s+T_inf)/2; % Tfilm
+                clc;
+                
                 [Re_D D]  = getRe(T_K, fluid, 'Re_D');
                 Pr = getPr(fluid, T_K); % make sure it's T_f
 
