@@ -49,7 +49,11 @@ switch convCase
                 % using ftns for this will decrease the amt of stuff we've
                 %   gotta put here, making the code easier to interpret
 
-                T_K = getTemp(); % Tfilm
+                T_inf = input('Enter the Upstream Fluid Temperature (C): ')+273.15;
+                T_s = input('Enter the Surface Temperature (C): ')+273.15;
+                T_K = (T_s+T_inf)/2; % Tfilm
+                clc;
+
                 [Re_L L] = getRe(T_K, fluid, 'Re_L');
                 Pr = getPr(fluid, T_K); % make sure it's T_f
 
@@ -62,7 +66,7 @@ switch convCase
                 T_s = input('Enter the Surface Temperature (C): ')+273.15;
                 T_K = (T_s+T_inf)/2; % Tfilm
                 clc;
-                
+
                 [Re_D D]  = getRe(T_K, fluid, 'Re_D');
                 Pr = getPr(fluid, T_K); % make sure it's T_f
 
@@ -72,12 +76,15 @@ switch convCase
                 clc;
                 disp('External conv, sphere');
 
-                T_K = getTemp(); % T_inf
+                T_inf = input('Enter the Upstream Fluid Temperature (C): ')+273.15;
+                T_s = input('Enter the Surface Temperature (C): ')+273.15;
+                T_K = (T_s+T_inf)/2; % Tfilm
+                clc;
+
                 [Re_D D]  = getRe(T_K, fluid, 'Re_D');
-                disp('***REMOVE*** Make sure its T_inf for Pr');
                 Pr = getPr(fluid, T_K); % make sure it's T_inf
                 mu = getFluidProp(fluid, T_K, 'mu');
-                mu_s = input('Dynamic viscosity @ surface (mu_s):');
+                mu_s = getFluidProp(fluid, T_s, 'mu');
 
                 Nu_D = ExtConvSphere(Re_D, Pr, mu, mu_s);
             case 4
@@ -396,15 +403,6 @@ switch fluidSelect
 end
 end
 
-function T_K = getTemp()
-% getTemp: Get the temperature from the user
-% Inputs
-%   Add more, this is a placeholder
-T_C = input('Enter the Temperature (C): ');
-T_K = T_C+273.15;
-clc;
-end
-
 function [Re,charDim] = getRe(T_K, fluid, re_type)
 % getRe:  Calculate Reynolds number using nu
 %   Re = getRe(T_K, fluid, re_type)
@@ -595,12 +593,11 @@ function Nu_D = ExtConvSphere(Re_D, Pr, mu, mu_s)
 
 % Get Pr from T_inf
 
-if Re_D <= 7.6e4 && Re_D >= 3.5 && Pr >= 0.71 && Pr <= 380 && mu/mu_s >= 1 && mu/mu_s <= 3.2
+if Re_D <= 7.6e4 && Re_D >= 3.5 && Pr >= 0.71 && Pr <= 380 && mu/mu_s >= 1 && mu/mu_s <= 3.2 % expanded range a little
     Nu_D = 2 + (0.4*Re_D.^(1/2) + 0.06*Re_D.^(2/3)).*Pr.^(0.4).*(mu./mu_s).^(1/4);
 else
-    disp('Re_D, Pr, or mu/mu_s outside acceptable range.');
-    disp('Make sure to use T_f for Pr.')
-    Nu_D = NaN;
+    warndlg('Re_D, Pr, or mu/mu_s outside acceptable range.');
+    Nu_D = 2 + (0.4*Re_D.^(1/2) + 0.06*Re_D.^(2/3)).*Pr.^(0.4).*(mu./mu_s).^(1/4);
 end
 end
 
