@@ -4,7 +4,7 @@ function f = fSSR(a,xm,ym)
 % a(1) = a0, a(2) = a1
 % sum of squares
 
-% call afterwards**** 
+% call afterwards****
 % a = fminsearch(@fSSR, [1 1], [], v, F)
 %   [1 1] is an initial guess for [a0, a1], [] is a placeholder for options
     F_pred = a(1) * xm.^a(2);  % change
