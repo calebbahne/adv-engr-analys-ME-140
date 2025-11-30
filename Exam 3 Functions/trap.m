@@ -1,14 +1,14 @@
 function I = trap(func,a,b,n,varargin)
 % trap: composite trapezoidal rule quadrature
-% I = trap(func,a,b,n,p1,p2,...):
+%   I = trap(func,a,b,n,p1,p2,...):
 % composite trapezoidal rule
 % input:
-% func = function handle to function to be integrated
-% a, b = integration limits
-% n = number of segments (default = 100)
-% p1,p2,... = additional parameters used by func
+%   func = function handle to function to be integrated
+%   a, b = integration limits
+%   n = number of segments (default = 100)
+%   p1,p2,... = additional parameters used by func
 % output:
-% I = integral estimate
+%   I = integral estimate
 if nargin<3,error('at least 3 input arguments required'),end
 if ~(b>a),error('upper bound must be greater than lower'),end
 if nargin<4||isempty(n),n=100;end
