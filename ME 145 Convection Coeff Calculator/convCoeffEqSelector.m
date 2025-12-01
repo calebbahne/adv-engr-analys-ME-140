@@ -51,11 +51,11 @@ switch convCase
 
                 T_inf = input('Enter the Upstream Fluid Temperature (C): ')+273.15;
                 T_s = input('Enter the Surface Temperature (C): ')+273.15;
-                T_K = (T_s+T_inf)/2; % Tfilm
+                T_f = (T_s+T_inf)/2; % Tfilm
                 clc;
 
-                [Re_L L] = getRe(T_K, fluid, 'Re_L');
-                Pr = getPr(fluid, T_K); % make sure it's T_f
+                [Re_L L] = getRe(T_f, fluid, 'Re_L');
+                Pr = getPr(fluid, T_f); % make sure it's T_f
 
                 [Nu_L, convType] = ExtConvFlatPlate(Re_L, Pr);
             case 2
@@ -64,11 +64,11 @@ switch convCase
 
                 T_inf = input('Enter the Upstream Fluid Temperature (C): ')+273.15;
                 T_s = input('Enter the Surface Temperature (C): ')+273.15;
-                T_K = (T_s+T_inf)/2; % Tfilm
+                T_f = (T_s+T_inf)/2; % Tfilm
                 clc;
 
-                [Re_D D]  = getRe(T_K, fluid, 'Re_D');
-                Pr = getPr(fluid, T_K); % make sure it's T_f
+                [Re_D D]  = getRe(T_f, fluid, 'Re_D');
+                Pr = getPr(fluid, T_f); % make sure it's T_f
 
 
                 Nu_D = ExtConvCyl(Re_D, Pr);
@@ -78,12 +78,12 @@ switch convCase
 
                 T_inf = input('Enter the Upstream Fluid Temperature (C): ')+273.15;
                 T_s = input('Enter the Surface Temperature (C): ')+273.15;
-                T_K = (T_s+T_inf)/2; % Tfilm
+                T_f = (T_s+T_inf)/2; % Tfilm
                 clc;
 
-                [Re_D D]  = getRe(T_K, fluid, 'Re_D');
-                Pr = getPr(fluid, T_K); % make sure it's T_inf
-                mu = getFluidProp(fluid, T_K, 'mu');
+                [Re_D D]  = getRe(T_f, fluid, 'Re_D');
+                Pr = getPr(fluid, T_f); % make sure it's T_inf
+                mu = getFluidProp(fluid, T_f, 'mu');
                 mu_s = getFluidProp(fluid, T_s, 'mu');
 
                 Nu_D = ExtConvSphere(Re_D, Pr, mu, mu_s);
@@ -115,23 +115,53 @@ switch convCase
         switch intConvCase
             case 1 % Circular tube
                 clc;
-                % ****** REMOVE THIS PART
-                disp('Select a circular tube flow:');
-                disp('  1. Laminar flow');
-                disp('  2. Turbulent flow');
-                circTubeFlow = input('Circular tube flow (1–2): ');
-                if circTubeFlow == 1
-                    disp('Int conv, laminar flow in circular tube');
-                elseif circTubeFlow == 2
-                    disp('Int conv, turbulent flow in circular tube');
-                else
-                    disp('Invalid selection.');
+                disp('Int conv, circular tube');
+
+                % logic to pick const surf temp or const flux or give Tinf
+                % calc T_m
+                % get L and/aka x
+                % set surf cond
+
+                clc;
+                disp('Select a surface condition:');
+                disp('  1. Uniform surface temperature T_s');
+                disp('  2. Uniform surface heat flux q"');
+                disp('  3. Other (enter T_inf)');
+                SurfCondit = input('Surface condition (1–3): ');
+                clc;
+
+                if SurfCondit == 1 
+                    T_s = input('Enter the surface temperature, T_s (C): ')+273.15; % K
+                elseif SurfCondit == 2 
+                %   move on
+                elseif SurfCondit == 3
+                    T_inf = input('Enter the surrounding temperature, T_inf (C): ')+273.15; % K
+                    T_s = T_inf;
+                    % assume a thin walled tube
                 end
-                  T1 = input('Enter the hotter wall temperature, T1 (C): ')+273.15; % K
-                  T2 = input('Enter the colder wall temperature, T2 (C): ')+273.15; % K
-                  [Ra, T_s, T_inf, T_f, L] = getRa(fluid, convType); 
-                  Pr = getFluidProp(fluid, T_K, 'Pr'); 
-                  Nu_L = IntCircularTube(Re_D, Pr, Ts, Tm);
+                clc;
+
+                T_mi = input('Enter the tube mean inlet temperature, T_mi (C): ')+273.15; % K
+                T_mo = input('Enter the tube mean outlet temperature, T_mo (C): ')+273.15; % K
+                clc;
+                
+                disp('Was any temperature assumed?');
+                disp('  1. None');
+                disp('  2. Outlet temperature (T_mo)');
+                disp('  3. Inlet temperature (T_mi)');
+                assumedVar = input('Assumption: ');
+                if assumedVar ~= 1
+                    tol = input('Enter tolerance for iteration (percent): ');
+                else
+                    tol = NaN;
+                end
+                clc;
+
+                T_m = (T_mi+T_mo)/2;
+                T_f = T_m; % helps us out in the end
+                [Re_D,D] = getRe(T_m, fluid, 'Re_D');
+                L = input('Enter the tube length, L (m): '); 
+                Nu_D = IntTube(fluid, Re_D, T_s, T_m, L, D, SurfCondit);
                
             case 2 % Noncircular tube
                 clc;
@@ -144,6 +174,7 @@ switch convCase
                     disp('Int conv, noncirc, square/rectangular duct');
                     % Use b/a to determine subcase.
                     % could be square, rect, inf rect, etc
+                    % calc hydraulic diam
                 elseif nonCircGeom == 2
                     clc;
                     disp('Int conv, noncirc, triangular duct');
@@ -339,7 +370,6 @@ end
 %% Display results
 disp('----------------------------------');
 disp('Convection coefficient calculation complete');
-%disp('   We love you Troy, so please give us the A :)');
 disp('----------------------------------');
 
 % Shows the final values based on what exists
@@ -358,7 +388,7 @@ else
 end
 
 if ~exist('T_f', 'var')
-    T_f = T_K; % happens if we have T_K and not T_f; a little clunky, change if time ***
+    T_f = T_m; % happens if we have T_K and not T_f; a little clunky, change if time **
 end
 
 k = getFluidProp(fluid, T_f, 'k');
@@ -587,8 +617,8 @@ function Nu_D = ExtConvCyl(Re_D, Pr)
 if Re_D*Pr >= 0.2
     Nu_D = 0.3 + (0.62*Re_D.^(1/2).*Pr.^(1/3).* (1+(0.4/Pr).^(2/3)).^(-1/4)).* (1+(Re_D/282000).^(5/8)).^(4/5);
 else
-    disp('Re_D*Pr outside acceptable range.');
-    disp('Make sure to use T_f for Pr.')
+    warndlg('Re_D*Pr outside acceptable range.');
+    warndlg('Make sure to use T_f for Pr.')
     Nu_D = NaN;
 end
 end
@@ -873,41 +903,143 @@ end
 
 %% Forced Internal
 %Flow in a circular tube [Chapter 8]
-% Case: External convection, flat plate
+% Case: 
+function [Nu_D, convType] = IntCircularTubeV0(Re_D, Pr, Ts, Tm, L, D)
 
-function [Nu_D, convType, f] = IntCircularTube(Re_D, Pr, Ts, Tm)
-
-if Re_D <= 2300 && Pr >= 0.5
+if Re_D <= 2300 && Pr >= 0.5 % laminar, thermal entry, uniform Ts
    convType = 'laminar'; 
-       Nu_D=3.66+(0.0668*G_zd)./(1+0.04*G_zd.^(2/3)); %has thermal entry
-elseif Re_L >= 2300 && Pr >= 0.1 
+       Nu_D = 3.66+(0.0668*G_zd)./(1+0.04*G_zd.^(2/3)); 
+elseif Re_L >= 2300 && Pr >= 0.1 % laminar, combined entry, uniform Ts
    convType = 'laminar';
-       %Nu_D=((3.66/tanh(2.264*G_zd.^(-1/3)+1.7*G_zd.^(-2/3))+0.0499*G_zd.*tanh(G_zd.^(-1)))./(tanh(2.432*Pr.^(1/6).*G_zd.^(-1/6))
+       %Nu_D=((3.66/tanh(2.264*G_zd.^(-1/3)+1.7*G_zd.^(-2/3))+0.0499*G_zd.*tanh(G_zd.^(-1)))./(tanh(2.432*Pr.^(1/6).*G_zd.^(-1/6));
        %has combined entry
-elseif Re_D >= 10000 && 0.6 <= Pr <= 160 && L_D>10 && Ts > Tm
+elseif Re_D >= 10000 && 0.6 <= Pr && Pr <= 160 && L/D>10 && Ts > Tm % turbulent, fully developed ** one of the most common
    convType = 'turbulent';
-       Nu_D=(0.023*Re_D.^(4/5).*Pr.^(0.3))
+       Nu_D=(0.023*Re_D.^(4/5).*Pr.^(0.3));
 
-elseif Re_D >= 10000 && 0.6 <= Pr <= 160 && Ts < Tm
+elseif Re_D >= 10000 && 0.6 <= Pr && Pr <= 160 && Ts < Tm % turbulent, fully developed (but Ts > Tm)
    convType = 'turbulent';
-       Nu_D=(0.023*Re_D.^(4/5).*Pr.^(0.4))
+       Nu_D=(0.023*Re_D.^(4/5).*Pr.^(0.4));
 
-elseif Re_D >= 10000 && 0.6 <= Pr <= 160 && Ts > Tm
+elseif Re_D >= 10000 && 0.6 <= Pr && Pr <= 160 && Ts > Tm
    convType = 'turbulent';
-       Nu_D=(0.023*Re_D.^(4/5).*Pr.^(0.3))
+       Nu_D=(0.023*Re_D.^(4/5).*Pr.^(0.3));
+ 
+elseif 3600 <= Re_D && Re_D <= 905000 && 0.003 <= Pr && Pr <= 0.05 && 100 <= Re_D*Pr && Re_D*Pr <= 10000 % liquid metals, we dont' need
+   convType = 'turbulent'; 
+       Nu_D = 4.82+0.0185*(Re_D.*Pr).^(0.827);
 
-elseif 3600 <= Re_D <= 905000 && 0.003 <= Pr <= 0.05 && 100 <= Re_D*Pr <= 10000
+elseif Re_D*Pr >= 100 % liquid metal
    convType = 'turbulent';
-       Nu_D=4.82+0.0185*(Re_D.*Pr).^(0.827)
-
-elseif Re_D*Pr >= 100
-   convType = 'turbulent';
-       Nu_D=5.0+0.025*(Re_D.*Pr).^(0.8)
+       Nu_D=5.0+0.025*(Re_D.*Pr).^(0.8);
 
 else
     warning('Re_L or Pr outside acceptable range.');
     convType = 'RE_OUTSIDE';
 end
+end
+
+function Nu_D = IntTube(fluid, Re_D, T_s, T_m, L, D, SurfCondit)
+% Case: Internal convection, tube
+% Nu_D = IntTube(fluid, Re_D, T_s, T_m, L, D, SurfCondit, x)
+%   ___ <= Re_D <= ___
+%   ** Assuming L/D > 10
+% Inputs:
+%   fluid, Re_D
+%   T_s = surface temp (K)
+%   T_m = mean temp in the tube (K)
+%   LD = tube length L / diam D
+%   SurfCondit = 0 -> none. 1 -> T_s uniform. 2 -> q" uniform
+% Outputs:
+%   Nu_D = avg Nusselt
+
+LD = L/D; x = L; % if we wanted non x = L, we could prompt for it
+
+if LD < 10
+    warndlg('IntTube: L/D < 10. Results may be inaccurate.');
+end
+
+% Get fluid properties
+Pr = getFluidProp(fluid, T_m, 'Pr');
+mu = getFluidProp(fluid, T_m, 'mu');   
+mu_s = getFluidProp(fluid, T_s, 'mu');
+
+% Graetz number
+G_zd = (D/x)*Re_D*Pr;
+
+% Determine lam/turb
+if Re_D < 2300
+    lamTurb = 'laminar';
+else
+    lamTurb = 'turbulent';
+end
+
+% Handle lam/turb
+switch lamTurb
+    case 'laminar'
+        G_zd_thresh = 100;  % we just picked this, kinda arbitrary
+        
+        if SurfCondit ~= 1 && SurfCondit ~= 2
+            warndlg('SurfCondit missing or invalid. Assuming T_s uniform (SurfCondit=1).');
+            SurfCondit = 1; % default to const temp
+        end
+        
+        if SurfCondit == 2 && G_zd < G_zd_thresh
+            % q" uniform
+            % Fully developed laminar, uniform q": Nu = 4.36
+            Nu_D = 4.36;
+            return;        
+        else % T_s uniform
+            if G_zd < G_zd_thresh
+                % Fully developed laminar
+                Nu_D = 3.66;
+                return;
+            else % we just assume const surf temp
+                if Pr >= 0.1
+                    % Nu_D = [ 3.66 / tanh(2.264 G_zd^{-1/3} + 1.7 G_zd^{-2/3}) + 0.0499 G_zd tanh(G_zd^{-1}) ] ...
+                    %        / tanh(2.432 Pr^{1/6} G_zd^{-1/6})
+                    % guard against zero/negative arguments in power operations
+                    A = 2.264 * (G_zd^(-1/3)) + 1.7 * (G_zd^(-2/3));
+                    term1 = 3.66 / tanh(A);
+                    term2 = 0.0499 * G_zd * tanh(G_zd^(-1));
+                    denom = tanh(2.432 * Pr^(1/6) * G_zd^(-1/6));
+                    Nu_D = (term1 + term2) / denom;
+                    return;
+                else
+                    Nu_D = 3.66 + (0.0668 * G_zd) / (1 + 0.04 * G_zd^(2/3));
+                    return;
+                end
+            end
+        end
+        
+    case 'turbulent'
+        % Must be fully developed hydraulically & thermally
+        if LD < 10
+            warndlg('IntTube: L/D < 10. We assume L/D >= 10.');
+        end
+     
+        if (Pr >= 0.6) && (Pr <= 160) && Re_D >= 10000 
+            n_DB = 0.3;
+            if T_s > T_m
+                n_DB = 0.4;
+            end
+            Nu_D = 0.023 * Re_D^(4/5) * Pr^(n_DB);
+            return;
+        else
+            if (Pr >= 0.7) && (Re_D >= 10000) && (LD >= 10)
+                Nu_D = 0.027 * Re_D^(4/5) * Pr^(1/3) * (mu / mu_s)^0.14;
+                return;
+            else
+                warndlg('Pr or Re outside the acceptable range');
+                Nu_D = 0.027 * Re_D^(4/5) * Pr^(1/3) * (mu / mu_s)^0.14;
+                return;
+            end
+        end
+        
+    otherwise
+        error('IntTube: Unknown lamTurb detection error.');
+end
+
 end
 
 %% Free Convection
