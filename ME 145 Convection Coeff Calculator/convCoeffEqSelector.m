@@ -117,19 +117,20 @@ switch convCase
                 clc;
                 disp('Int conv, circular tube');
 
-                [T_s, T_inf, T_mi, T_mo, T_m, T_f, SurfCondit, assumedVar, tol] = getTubeVals();
+                [T_s, T_mi, T_mo, T_m, T_f, SurfCondit, assumedVar, tol] = getTubeVals();
                 [Re_D,D] = getRe(T_m, fluid, 'Re_D');
                 L = input('Enter the tube length, L (m): '); 
-                [Nu_D convType] = IntTube(fluid, Re_D, T_s, T_m, L, D, SurfCondit);
+                [Nu_D, convType] = IntTube(fluid, Re_D, T_s, T_m, L, D, SurfCondit);
                
             case 2 % Noncircular tube
                 clc;
 
-                [T_s, T_inf, T_mi, T_mo, T_m, T_f, SurfCondit, assumedVar, tol] = getTubeVals();
+                [T_s, T_mi, T_mo, T_m, T_f, SurfCondit, assumedVar, tol] = getTubeVals();
 
-                [Re_D,D_h, geom,a, b, sc] = getReHydraul(T_m, fluid); % handles shape, gets hydraulic diam
+                [Re_D,D_h, geom,a, b] = getReHydraul(T_m, fluid); % handles shape, gets hydraulic diam
                 L = input('Enter the tube length, L (m): '); 
-                [Nu_D convType] = IntTubeNonCirc(fluid, Re_D, T_s, T_m, L, D_h, SurfCondit, geom, a, b, sc);
+                [Nu_D, convType] = IntTubeNonCirc(fluid, Re_D, T_s, T_m, L, D_h, SurfCondit, geom, a, b);
+                D = D_h; % saves time later
             otherwise
                 disp('Invalid selection.');
         end
@@ -477,8 +478,8 @@ clc;
 switch geom
     case 1 % rectangle/square
         fprintf('Rectangle duct selected.\n');
-        a = input('Enter shorter side length a (m): ');
-        b = input('Enter longer side length b (m): ');
+        a = input('Enter shorter side length, a (m): ');
+        b = input('Enter longer side length, b (m): ');
         % Ensure positive
         assert(a > 0 && b > 0, 'Sides must be positive.');
         % Cross-sectional area and perimeter
@@ -506,10 +507,11 @@ end
 
 % Hydraulic diameter
 D_h = 4*A_c/P;
+clc;
 
 disp('Select Re input method for this hydraulic diameter:');
-disp('  1. Velocity (V) -> Re = V*D_h/nu');
-disp('  2. Mass flow rate (mdot) -> compute um = mdot/(rho*A) then Re = um*D_h/nu');
+disp('  1. Velocity (V)');
+disp('  2. Mass flow rate (mdot)');
 disp('  3. Direct input (Re)');
 ReChoice = input('Re input method (1-3): ');
 clc;
@@ -1088,7 +1090,7 @@ switch lamTurb
 end
 end
 
-function [T_s, T_inf, T_mi, T_mo, T_m, T_f, SurfCondit, assumedVar, tol] = getTubeVals()
+function [T_s, T_mi, T_mo, T_m, T_f, SurfCondit, assumedVar, tol] = getTubeVals()
     clc;
     disp('Select a surface condition:');
     disp('  1. Uniform surface temperature T_s');
@@ -1128,7 +1130,7 @@ function [T_s, T_inf, T_mi, T_mo, T_m, T_f, SurfCondit, assumedVar, tol] = getTu
     T_f = T_m; % helps us out in the end
 end
 
-function [Nu_D convType] = IntTubeNonCirc(fluid, Re_D, T_s, T_m, L, D, SurfCondit, geom, a,b)
+function [Nu_D convType] = IntTubeNonCirc(fluid, Re_D, T_s, T_m, L, D_h, SurfCondit, geom, a,b)
 % Case: Internal convection, tube, noncircular
 % Nu_D = IntTube(fluid, Re_D, T_s, T_m, L, D, SurfCondit, x)
 %   ___ <= Re_D <= ___
@@ -1153,13 +1155,14 @@ if Re_D < 2300 && LD >= 10
         b_a_vals = [1.0, 1.43, 2.0, 3.0, 4.0, 8.0, 1e6]; % b/a
         Nu_q_vals = [3.61, 3.73, 4.12, 4.79, 5.33, 6.49, 8.23]; % Nu for uniform q" 
         Nu_T_vals = [2.98, 3.08, 3.39, 3.96, 4.44, 5.60, 7.54]; % Nu for uniform T_s
-        if sc == 1
+        if SurfCondit == 1
+            Nu_D = interp1(b_a_vals, Nu_T_vals, b_over_a, 'linear');
+            convType = 'laminar, rect cross sect, fully developed, uniform T_s';
+        else
+
             Nu_D = interp1(b_a_vals, Nu_q_vals, b_over_a, 'linear'); % chapter 18, linear interpolation ftn
             % this one's built in, so no need to include polyint, etc
             convType = 'laminar, rect cross sect, fully developed, uniform q"';
-        else
-            Nu_D = interp1(b_a_vals, Nu_T_vals, b_over_a, 'linear');
-            convType = 'laminar, rect cross sect, fully developed, uniform T_s';
         end
 
         return;
@@ -1168,7 +1171,7 @@ if Re_D < 2300 && LD >= 10
         % Triangle (fully developed laminar)
         Nu_q_tri = 3.11;
         Nu_T_tri = 2.49;
-        if sc == 1 % q" uniform
+        if SurfCondit == 2 % q" uniform
             Nu_D = Nu_q_tri;
             convType = 'laminar, triangle, fully developed, uniform q"';
         else % T_s uniform
