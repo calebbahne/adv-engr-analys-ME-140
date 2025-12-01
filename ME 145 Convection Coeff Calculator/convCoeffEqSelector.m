@@ -117,71 +117,19 @@ switch convCase
                 clc;
                 disp('Int conv, circular tube');
 
-                % logic to pick const surf temp or const flux or give Tinf
-                % calc T_m
-                % get L and/aka x
-                % set surf cond
-
-                clc;
-                disp('Select a surface condition:');
-                disp('  1. Uniform surface temperature T_s');
-                disp('  2. Uniform surface heat flux q"');
-                disp('  3. Other (enter T_inf)');
-                SurfCondit = input('Surface condition (1–3): ');
-                clc;
-
-                if SurfCondit == 1 
-                    T_s = input('Enter the surface temperature, T_s (C): ')+273.15; % K
-                elseif SurfCondit == 2 
-                %   move on
-                elseif SurfCondit == 3
-                    T_inf = input('Enter the surrounding temperature, T_inf (C): ')+273.15; % K
-                    T_s = T_inf;
-                    % assume a thin walled tube
-                end
-                clc;
-
-                T_mi = input('Enter the tube mean inlet temperature, T_mi (C): ')+273.15; % K
-                T_mo = input('Enter the tube mean outlet temperature, T_mo (C): ')+273.15; % K
-                clc;
-                
-                disp('Was any temperature assumed?');
-                disp('  1. None');
-                disp('  2. Outlet temperature (T_mo)');
-                disp('  3. Inlet temperature (T_mi)');
-                assumedVar = input('Assumption: ');
-                if assumedVar ~= 1
-                    tol = input('Enter tolerance for iteration (percent): ');
-                else
-                    tol = NaN;
-                end
-                clc;
-
-                T_m = (T_mi+T_mo)/2;
-                T_f = T_m; % helps us out in the end
+                [T_s, T_inf, T_mi, T_mo, T_m, T_f, SurfCondit, assumedVar, tol] = getTubeVals();
                 [Re_D,D] = getRe(T_m, fluid, 'Re_D');
                 L = input('Enter the tube length, L (m): '); 
-                Nu_D = IntTube(fluid, Re_D, T_s, T_m, L, D, SurfCondit);
+                [Nu_D convType] = IntTube(fluid, Re_D, T_s, T_m, L, D, SurfCondit);
                
             case 2 % Noncircular tube
                 clc;
-                disp('Select a noncircular tube:');
-                disp('  1. Square/rectangle');
-                disp('  2. Triangle');
-                nonCircGeom = input('Select geometry (1–2): ');
-                if nonCircGeom == 1
-                    clc;
-                    disp('Int conv, noncirc, square/rectangular duct');
-                    % Use b/a to determine subcase.
-                    % could be square, rect, inf rect, etc
-                    % calc hydraulic diam
-                elseif nonCircGeom == 2
-                    clc;
-                    disp('Int conv, noncirc, triangular duct');
-                else
-                    clc;
-                    disp('Invalid selection.');
-                end
+
+                [T_s, T_inf, T_mi, T_mo, T_m, T_f, SurfCondit, assumedVar, tol] = getTubeVals();
+
+                [Re_D,D_h, geom,a, b, sc] = getReHydraul(T_m, fluid); % handles shape, gets hydraulic diam
+                L = input('Enter the tube length, L (m): '); 
+                [Nu_D convType] = IntTubeNonCirc(fluid, Re_D, T_s, T_m, L, D_h, SurfCondit, geom, a, b, sc);
             otherwise
                 disp('Invalid selection.');
         end
@@ -470,14 +418,30 @@ end
 % Ask user whether to compute or directly supply Re
 disp('Select Re input method:');
 fprintf('   1. Velocity (V), %s\n', charName);
-disp('   2. Direct input (Re)');
+disp('   2. Mass flow rate (mdot, kg/s)');
+disp('   3. Direct input (Re)');
 ReChoice = input('Re input method: ');
 clc;
 
-if ReChoice == 2
+if ReChoice == 3
     Re = input('Enter Re: ');
     charDim = input(sprintf('Enter characteristic %s (m): ', charName));
     return
+elseif ReChoice == 2
+    % Compute from mass flow rate mdot (kg/s)
+    mdot = input('Enter mass flow rate mdot (kg/s): ');
+    mu = getFluidProp(fluid, T_K, 'mu');
+    if contains(lower(charName),'diameter')
+        charDim = input(sprintf('Enter characteristic %s (m): ', charName));
+        D = charDim;
+        Re = (4 * mdot) / (pi * D * mu);
+        return;
+    else
+        % For non-diameter , ask for cross-sectional area A (m^2)
+        A = input('Enter cross-sectional area A (m^2): ');
+        Re = mdot * charDim / (A * mu);
+        return;
+    end
 end
 clc;
 
@@ -491,6 +455,84 @@ nu = getFluidProp(fluid, T_K, 'nu');
 
 % Compute Reynolds number
 Re = V * charDim / nu;
+end
+
+function [Re_D, D_h, geom, a, b] = getReHydraul(T_m, fluid)
+% getReHydraul: gets the Reynolds number for hydraulic diameter
+% [Re_D, D_h, geom] = getReHydraul(T_m, fluid)
+% Input:
+%   T_m = mean temp (input and output means)
+%   fluid 
+% Output
+%   Re_D
+%   D_h = hydraulic diameter
+%   geom = 1 if rect/square, 2 if triangle
+    clc;
+disp('Select a noncircular cross-section:');
+disp('  1. Rectangle / square');
+disp('  2. Triangle');
+geom = input('Select geometry (1-2): ');
+clc;
+
+switch geom
+    case 1 % rectangle/square
+        fprintf('Rectangle duct selected.\n');
+        a = input('Enter shorter side length a (m): ');
+        b = input('Enter longer side length b (m): ');
+        % Ensure positive
+        assert(a > 0 && b > 0, 'Sides must be positive.');
+        % Cross-sectional area and perimeter
+        A_c = a * b;
+        P = 2*(a + b);
+        b_over_a = b / a;
+    case 2 % triangle
+        fprintf('Triangular duct selected.\n');
+        base = input('Enter base (m): ');
+        height = input('Enter height (m): ');
+        use_perim = input('Do you know the wetted perimeter (y/n)? ', 's');
+        if lower(use_perim) == 'y'
+            P = input('Enter wetted perimeter P (m): ');
+            A_c = 0.5 * base * height;
+        else
+            % assume an isosceles with two equal sides: compute sides from base & height
+            side = sqrt((base/2)^2 + height^2);
+            P = base + 2*side;
+            A_c = 0.5 * base * height;
+        end
+        a = NaN; b = NaN;
+    otherwise
+        error('Invalid geometry selection.');
+end
+
+% Hydraulic diameter
+D_h = 4*A_c/P;
+
+disp('Select Re input method for this hydraulic diameter:');
+disp('  1. Velocity (V) -> Re = V*D_h/nu');
+disp('  2. Mass flow rate (mdot) -> compute um = mdot/(rho*A) then Re = um*D_h/nu');
+disp('  3. Direct input (Re)');
+ReChoice = input('Re input method (1-3): ');
+clc;
+
+% Get fluid properties needed
+nu = getFluidProp(fluid, T_m, 'nu');   % kinematic viscosity m^2/s
+mu  = getFluidProp(fluid, T_m, 'mu');  % dynamic viscosity Pa*s
+rho = getFluidProp(fluid, T_m, 'rho'); % density kg/m^3
+
+if ReChoice == 3
+    Re_D = input('Enter Re based on D_h: ');
+else
+    if ReChoice == 1
+        V = input('Enter velocity V (m/s): ');
+        Re_D = V * D_h / nu;
+    elseif ReChoice == 2
+        mdot = input('Enter mass flow rate mdot (kg/s): ');
+        um = mdot / (rho * A_c);
+        Re_D = um * D_h / nu;
+    else
+        error('Invalid Re input selection.');
+    end
+end
 end
 
 
@@ -939,7 +981,7 @@ else
 end
 end
 
-function Nu_D = IntTube(fluid, Re_D, T_s, T_m, L, D, SurfCondit)
+function [Nu_D convType] = IntTube(fluid, Re_D, T_s, T_m, L, D, SurfCondit)
 % Case: Internal convection, tube
 % Nu_D = IntTube(fluid, Re_D, T_s, T_m, L, D, SurfCondit, x)
 %   ___ <= Re_D <= ___
@@ -985,14 +1027,14 @@ switch lamTurb
         end
         
         if SurfCondit == 2 && G_zd < G_zd_thresh
-            % q" uniform
-            % Fully developed laminar, uniform q": Nu = 4.36
             Nu_D = 4.36;
+            convType = 'Fully developed laminar, uniform q"';
             return;        
         else % T_s uniform
             if G_zd < G_zd_thresh
                 % Fully developed laminar
                 Nu_D = 3.66;
+                convType = 'Fully developed laminar, uniform T_s';
                 return;
             else % we just assume const surf temp
                 if Pr >= 0.1
@@ -1004,9 +1046,11 @@ switch lamTurb
                     term2 = 0.0499 * G_zd * tanh(G_zd^(-1));
                     denom = tanh(2.432 * Pr^(1/6) * G_zd^(-1/6));
                     Nu_D = (term1 + term2) / denom;
+                    convType = 'Laminar, combined entry, uniform T_s';
                     return;
                 else
                     Nu_D = 3.66 + (0.0668 * G_zd) / (1 + 0.04 * G_zd^(2/3));
+                    convType = 'Laminar, thermal entry, uniform T_s';
                     return;
                 end
             end
@@ -1019,19 +1063,22 @@ switch lamTurb
         end
      
         if (Pr >= 0.6) && (Pr <= 160) && Re_D >= 10000 
-            n_DB = 0.3;
+            n = 0.3;
             if T_s > T_m
-                n_DB = 0.4;
+                n = 0.4;
             end
-            Nu_D = 0.023 * Re_D^(4/5) * Pr^(n_DB);
+            Nu_D = 0.023 * Re_D^(4/5) * Pr^(n);
+            convType = 'Turbulent, fully developed, eq 8.60';
             return;
         else
             if (Pr >= 0.7) && (Re_D >= 10000) && (LD >= 10)
                 Nu_D = 0.027 * Re_D^(4/5) * Pr^(1/3) * (mu / mu_s)^0.14;
+                convType = 'Turbulent, fully developed, eq 8.61';
                 return;
             else
                 warndlg('Pr or Re outside the acceptable range');
                 Nu_D = 0.027 * Re_D^(4/5) * Pr^(1/3) * (mu / mu_s)^0.14;
+                convType = 'Turbulent, fully developed, eq 8.61';
                 return;
             end
         end
@@ -1039,7 +1086,101 @@ switch lamTurb
     otherwise
         error('IntTube: Unknown lamTurb detection error.');
 end
+end
 
+function [T_s, T_inf, T_mi, T_mo, T_m, T_f, SurfCondit, assumedVar, tol] = getTubeVals()
+    clc;
+    disp('Select a surface condition:');
+    disp('  1. Uniform surface temperature T_s');
+    disp('  2. Uniform surface heat flux q"');
+    disp('  3. Other (enter T_inf)');
+    SurfCondit = input('Surface condition (1–3): ');
+    clc;
+
+    if SurfCondit == 1 
+        T_s = input('Enter the surface temperature, T_s (C): ')+273.15; % K
+    elseif SurfCondit == 2 
+        T_s = 273.15; % assume, it shouldn't matter
+    elseif SurfCondit == 3
+        T_inf = input('Enter the surrounding temperature, T_inf (C): ')+273.15; % K
+        T_s = T_inf;
+        % assume a thin walled tube
+    end
+    clc;
+
+    T_mi = input('Enter the tube mean inlet temperature, T_mi (C): ')+273.15; % K
+    T_mo = input('Enter the tube mean outlet temperature, T_mo (C): ')+273.15; % K
+    clc;
+    
+    disp('Was any temperature assumed?');
+    disp('  1. None');
+    disp('  2. Outlet temperature (T_mo)');
+    disp('  3. Inlet temperature (T_mi)');
+    assumedVar = input('Assumption: ');
+    if assumedVar ~= 1
+        tol = input('Enter tolerance for iteration (percent): ');
+    else
+        tol = NaN;
+    end
+    clc;
+
+    T_m = (T_mi+T_mo)/2;
+    T_f = T_m; % helps us out in the end
+end
+
+function [Nu_D convType] = IntTubeNonCirc(fluid, Re_D, T_s, T_m, L, D, SurfCondit, geom, a,b)
+% Case: Internal convection, tube, noncircular
+% Nu_D = IntTube(fluid, Re_D, T_s, T_m, L, D, SurfCondit, x)
+%   ___ <= Re_D <= ___
+%   ** Assuming L/D > 10
+% Inputs:
+%   fluid, Re_D
+%   T_s = surface temp (K)
+%   T_m = mean temp in the tube (K)
+%   LD = tube length L / diam D
+%   SurfCondit = 0 -> none. 1 -> T_s uniform. 2 -> q" uniform
+% Outputs:
+%   Nu_D = avg Nusselt
+
+LD = L / D_h;
+if LD < 10
+    warndlg('NonCircTube: L/D < 10. Fully-developed assumptions may be invalid.');
+end
+
+if Re_D < 2300 && LD >= 10
+    if geom == 1 % rect
+        b_over_a = b / a;
+        b_a_vals = [1.0, 1.43, 2.0, 3.0, 4.0, 8.0, 1e6]; % b/a
+        Nu_q_vals = [3.61, 3.73, 4.12, 4.79, 5.33, 6.49, 8.23]; % Nu for uniform q" 
+        Nu_T_vals = [2.98, 3.08, 3.39, 3.96, 4.44, 5.60, 7.54]; % Nu for uniform T_s
+        if sc == 1
+            Nu_D = interp1(b_a_vals, Nu_q_vals, b_over_a, 'linear'); % chapter 18, linear interpolation ftn
+            % this one's built in, so no need to include polyint, etc
+            convType = 'laminar, rect cross sect, fully developed, uniform q"';
+        else
+            Nu_D = interp1(b_a_vals, Nu_T_vals, b_over_a, 'linear');
+            convType = 'laminar, rect cross sect, fully developed, uniform T_s';
+        end
+
+        return;
+        
+    elseif geom == 2
+        % Triangle (fully developed laminar)
+        Nu_q_tri = 3.11;
+        Nu_T_tri = 2.49;
+        if sc == 1 % q" uniform
+            Nu_D = Nu_q_tri;
+            convType = 'laminar, triangle, fully developed, uniform q"';
+        else % T_s uniform
+            Nu_D = Nu_T_tri;
+            convType = 'laminar, triangle, fully developed, uniform T_s';
+        end
+        return;
+    end
+else
+    [Nu_D convType] = IntTube(fluid, Re_D, T_s, T_m, L, D_h, SurfCondit);
+    return;
+end
 end
 
 %% Free Convection
@@ -1330,7 +1471,7 @@ function val = getWaterProp(T_K, prop)
 % Output:
 %   val = interpolated value
 
-if T_K < 273.15 || T_K > 647.3
+if T_K < 260 || T_K > 650
     disp('Temperature outside acceptable range.');
     val = [];
     return;
