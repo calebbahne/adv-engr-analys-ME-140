@@ -11,6 +11,7 @@
 %   - Test and verify, put 'verified' on what's tested
 
 clc; clear;
+Re_L = NaN; Re_D = NaN; Ra_L = NaN; Ra_D = NaN; L = NaN; D = NaN;
 
 disp('Convection Coefficient Calculator');
 disp('   - This code calculates the avg convection coefficient (h) for common heat & mass situations.');
@@ -185,7 +186,6 @@ switch convCase
                                     convType = 'Ra_L';
 
                                     [Ra_L, T_s, T_inf, T_f, L] = getRa(fluid, convType);
-                                    T_f = mean([T_s T_inf]);
                                     Pr = getPr(fluid, T_f);
                                     Nu_L = freeConvExtPlateHorizHotUpper(Ra_L,Pr);
                                 elseif hotcold == 2
@@ -194,7 +194,6 @@ switch convCase
                                     convType = 'Ra_L';
 
                                     [Ra_L, T_s, T_inf, T_f, L] = getRa(fluid, convType);
-                                    T_f = mean([T_s T_inf]);
                                     Pr = getPr(fluid, T_f);
                                     Nu_L = freeConvExtPlateHorizHotLower(Ra_L,Pr);
                                 else
@@ -209,19 +208,20 @@ switch convCase
                                 incline = input('Select configuration (1–2): ');
                                 if incline == 1
                                     clc;
-                                    disp('Free conv, immersed, inclined plate, old surface up / hot surface down');
+                                    disp('Free conv, immersed, inclined plate, cold surface up / hot surface down');
 
                                     theta = input('Inclination angle theta (deg):');
                                     convType = 'Ra_L';
-                                    %   Ra calc'd with g*cos(theta) *****
+                                    %   Ra calc'd with g*cosd(theta)
+                                    clc;
                                     [Ra_L, T_s, T_inf, T_f, L] = getRa(fluid, convType);
-                                    T_f = mean([T_s T_inf]);
-                                    Pr = getPr(fluid, T_K);
+                                    Ra_L = Ra_L*cosd(theta);
+                                    Pr = getPr(fluid, T_f);
 
                                     Nu_L = freeConvExtPlateInc(Ra_L,Pr,theta);
                                 else
                                     clc;
-                                    disp('Not currently supported (not in textbook)');
+                                    warndlg('Not currently supported (not in textbook)');
                                     % this one's not in table 9.3
                                 end
                             otherwise
@@ -245,7 +245,7 @@ switch convCase
                         [Ra_D, T_s, T_inf, T_f, D] = getRa(fluid, convType);
                         T_f = mean([T_s T_inf]);
                      
-                        Pr = getPr(fluid, T_K);
+                        Pr = getPr(fluid, T_f);
                         
                         Nu_D = freeConvExtSphere(Ra_D,Pr);
                     otherwise
@@ -328,10 +328,12 @@ if exist('Nu_L', 'var') && exist('L', 'var')
     Nu = Nu_L;
     charDim = L;
     Re_end = Re_L;
+    Ra_end = Ra_L
 elseif exist('Nu_D', 'var') && exist('D', 'var')
     Nu = Nu_D;
     charDim = D;
     Re_end = Re_D;
+    Ra_end = Ra_D;
 else
     warndlg('Error: Neither (Nu_L, L) nor (Nu_D, D) found.');
 end
@@ -369,7 +371,12 @@ fprintf('\n=== Convection Coefficient Results ===\n');
 fprintf('Fluid:                             %s\n', fluid);
 fprintf('Film Temperature (T_f):            %.2f C\n', T_f-273.15);
 fprintf('Characteristic Dimension (L or D): %.4f m\n', charDim);
-fprintf('Reynolds Number (Re):              %d \n',Re_end);
+if ~isnan(Re_end)
+    fprintf('Reynolds Number (Re):              %d \n',Re_end);
+end
+if ~isnan(Ra_end)
+    fprintf('Rayleigh Number (Ra):              %d \n',Ra_end);
+end
 fprintf('Nusselt Number (Nu):               %.4f\n', Nu);
 fprintf('Convection Coefficient (h):        %.4f W/m²·K\n', h);
 
@@ -595,14 +602,35 @@ L = input(sprintf('Enter characteristic %s (m): ', charName));
 clc;
 
 T_f = mean([T_s T_inf]);
-% ****** Need alpha?
 % alpha = getFluidProp(fluid, T_f, 'alpha';
 nu = getFluidProp(fluid, T_f, 'nu');
 Pr = getFluidProp(fluid, T_f, 'pr');
 
 % Constants
-g = 9.81;                  % gravitational acceleration (m/s^2)
-beta = 1 / T_f;            % thermal expansion coefficient (1/K)
+g = 9.81;                  % grav accel (m/s^2)
+
+dT = 0.1;
+
+if strcmpi(fluid,'water') % can't use ideal gas approx
+        rho_m = getFluidProp(fluid, T_f, 'rho');         
+        rho_plus = getFluidProp(fluid, T_f + dT, 'rho'); 
+        rho_minus = getFluidProp(fluid, T_f - dT, 'rho');
+        % I found out we needed to do this from AI, not in the textbook
+
+    % derivative 
+    drho_dT = (rho_plus - rho_minus) / (2*dT);
+    beta = - (1 ./ rho_m) .* drho_dT; % vol expansion coeff
+
+    % sanity check: if beta is negative or zero, warn and clamp to reasonable value
+    if beta <= 0
+        warndlg('beta not positive, falling back to lit val');
+        beta = 4.6e-4; % at 50 C
+    end
+else
+    % Ideal gas approx, doesn't work for water
+    beta = 1 / T_f;
+end
+
 deltaT = T_s - T_inf;      % temperature difference
 
 % Compute Grashof number
@@ -1262,8 +1290,8 @@ function Nu_L = freeConvExtPlateHorizHotLower(Ra_L,Pr)
 if Ra_L >= 10^4 && Ra_L <= 10^9 && Pr >= 0.7
     Nu_L = 0.52*Ra_L.^(1/5);
 else
-    disp('Invalid combination of Ra_L and Pr');
-    Nu_L = NaN;
+    warndlg('Invalid combination of Ra_L and Pr');
+    Nu_L = 0.52*Ra_L.^(1/5);
 end
 end
 
@@ -1280,7 +1308,7 @@ if Ra_D <= 10^12
     Nu_D = (0.60 + 0.387*Ra_D.^(1/6) ./(1+(0.559/Pr).^(9/16)).^(8/27)).^2;
 else
     disp('Invalid combination of Ra_D and Pr');
-    Nu_D = NaN;
+    Nu_D = (0.60 + 0.387*Ra_D.^(1/6) ./(1+(0.559/Pr).^(9/16)).^(8/27)).^2;
 end
 end
 
@@ -1298,7 +1326,7 @@ if Ra_D <= 10^12 && Pr >= 0.7
     Nu_D = 2 + 0.589*Ra_D.^(1/4) ./(1+(0.469/Pr).^(9/16)).^(4/9);
 else
     disp('Invalid combination of Ra_D and Pr');
-    Nu_D = NaN;
+    Nu_D = 2 + 0.589*Ra_D.^(1/4) ./(1+(0.469/Pr).^(9/16)).^(4/9);
 end
 end
 
