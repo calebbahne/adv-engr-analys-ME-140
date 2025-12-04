@@ -330,12 +330,12 @@ else
 end
 
 if ~exist('T_f', 'var')
-    T_f = T_m; % happens if we have T_K and not T_f; a little clunky, change if time **
+    T_f = T_m; % happens if we have T_K and not T_f
 end
 
 k = getFluidProp(fluid, T_f, 'k');
 
-% Calculate convection coefficient **** This is the whole point
+% Calculate convection coefficient (this is the whole point)
 h = Nu * k / charDim;
 
 clc;
@@ -979,7 +979,7 @@ elseif Re_L >= 2300 && Pr >= 0.1 % laminar, combined entry, uniform Ts
    convType = 'laminar';
        %Nu_D=((3.66/tanh(2.264*G_zd.^(-1/3)+1.7*G_zd.^(-2/3))+0.0499*G_zd.*tanh(G_zd.^(-1)))./(tanh(2.432*Pr.^(1/6).*G_zd.^(-1/6));
        %has combined entry
-elseif Re_D >= 10000 && 0.6 <= Pr && Pr <= 160 && L/D>10 && Ts > Tm % turbulent, fully developed ** one of the most common
+elseif Re_D >= 10000 && 0.6 <= Pr && Pr <= 160 && L/D>10 && Ts > Tm % turbulent, fully developed (one of the most common)
    convType = 'turbulent';
        Nu_D=(0.023*Re_D.^(4/5).*Pr.^(0.3));
 
@@ -1009,7 +1009,7 @@ function [Nu_D convType] = IntTube(fluid, Re_D, T_s, T_m, L, D, SurfCondit)
 % Case: Internal convection, tube
 % Nu_D = IntTube(fluid, Re_D, T_s, T_m, L, D, SurfCondit, x)
 %   ___ <= Re_D <= ___
-%   ** Assuming L/D > 10
+%   Assuming L/D > 10
 % Inputs:
 %   fluid, Re_D
 %   T_s = surface temp (K)
@@ -1156,7 +1156,7 @@ function [Nu_D convType] = IntTubeNonCirc(fluid, Re_D, T_s, T_m, L, D_h, SurfCon
 % Case: Internal convection, tube, noncircular
 % Nu_D = IntTube(fluid, Re_D, T_s, T_m, L, D, SurfCondit, x)
 %   ___ <= Re_D <= ___
-%   ** Assuming L/D > 10
+%   Assuming L/D > 10
 % Inputs:
 %   fluid, Re_D
 %   T_s = surface temp (K)
@@ -1234,7 +1234,7 @@ end
 function Nu_L = freeConvExtPlateInc(Ra_L,Pr,theta)
 % Case: Free convection, external, inclined plate, cold up or hot down
 %   0 <= theta <= 60 (degrees)
-%   Use g*cos(theta) instead of g for Ra_L calc **
+%   Use g*cos(theta) instead of g for Ra_L calc (we do that outside getRa)
 %       Just use the laminar vert plate
 % Nu_L = freeConvExtPlateInc(Ra_L,Pr)
 % Inputs:
@@ -1371,19 +1371,6 @@ else
     warndlg('VertCav: Invalid combination of Ra_L and Pr');
     Nu_L = NaN;
 end
-end
-
-% Enclosures
-function Nu_L = freeConvEncRectCavInclined(Ra_L,Pr, tao)
-% Case: Free convection, enclosed, rectangular cavity. Just a first approx
-%   Ra_L <= 7e9, Ra_L >= 3e5
-%   Nu_L = freeConvEncRectCav(Ra_L,Pr)
-% Inputs:
-%   Ra_L, Pr
-% Outputs:
-%   Nu_L
-
-% **** UPDATE 
 end
 
 %% Interpolation Ftns
@@ -1538,7 +1525,7 @@ mu_water_1e6 = [ ...
  143 136 129 124 118 113 108 104 101 97 94 91 88 84 81 77 72 ...
  70 67 64 59 54 45];
 
-% Thermal conductivity (k_f * 1e3 W/m·K) % change****
+% Thermal conductivity (k_f * 1e3 W/m·K) 
 k_water_1e3 = [ ...
  569 574 582 590 598 606 613 620 628 634 640 645 650 656 660 ...
  664 668 671 674 677 679 681 683 685 686 688 688 688 685 682 ...
