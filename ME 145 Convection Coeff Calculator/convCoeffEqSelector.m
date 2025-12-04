@@ -257,9 +257,8 @@ switch convCase
                 clc;
                 disp('Select an enclosed free convection geometry:');
                 disp('  1. Rectangular cavity');
-                disp('  2. Concentric cylinders');
-                disp('  3. Concentric spheres');
-                encFreeGeom = input('Geometry (1–3): ');
+                disp('  2. Other (not yet supported)');
+                encFreeGeom = input('Geometry (1–2): ');
 
                 switch encFreeGeom
                     case 1
@@ -267,8 +266,7 @@ switch convCase
                         disp('Select a rectangular cavity orientation:');
                         disp('  1. Vertical');
                         disp('  2. Horizontal');
-                        disp('  3. Inclined');
-                        cavity = input('Orientation (1–3): ');
+                        cavity = input('Orientation (1–2): ');
                         if cavity == 1
                             clc;
                             disp('Free convect, enclosed, rectangular, vertical rectangular cavity');
@@ -277,8 +275,9 @@ switch convCase
                             L = input('Enter the length of the enclosure (L): ');
                             T1 = input('Enter the hotter wall temperature, T1 (C): ')+273.15; % K
                             T2 = input('Enter the colder wall temperature, T2 (C): ')+273.15; % K
-                            [Ra, T_s, T_inf, T_f, L] = getRa(fluid, convType); %****** Need a different Ra calculator for this, handling T1 and T2
-                            Pr = getFluidProp(fluid, T_K, 'Pr'); %***** Change T_K
+                            clc;
+                            [Ra_L, T_s, T_inf, T_f, L] = getRa(fluid, 'Ra_L', T1, T2, L); 
+                            Pr = getFluidProp(fluid, T_f, 'Pr'); 
                             Nu_L = freeConvEncRectVertCav(Ra_L,Pr,H,L);
                         elseif cavity == 2
                             clc;
@@ -288,32 +287,24 @@ switch convCase
                             L = input('Enter the length of the enclosure (L): ');
                             T1 = input('Enter the hotter wall temperature, T1 (C): ')+273.15; % K
                             T2 = input('Enter the colder wall temperature, T2 (C): ')+273.15; % K
-                            [Ra, T_s, T_inf, T_f, L] = getRa(fluid, convType); %****** Need a different Ra calculator for this, handling T1 and T2
-                            Pr = getFluidProp(fluid, T_K, 'Pr'); %***** Change T_K
-                            Nu_L = freeConvEncRectCavHorizHeatBelow(Ra_L,Pr);
-                        elseif cavity == 3
                             clc;
-                            disp('Free convect, enclosed, rectangular, inclined rectangular cavity');
+                            [Ra_L, T_s, T_inf, T_f, L] = getRa(fluid, 'Ra_L', T1, T2, L); 
+                            Pr = getFluidProp(fluid, T_f, 'Pr'); 
+                            Nu_L = freeConvEncRectCavHorizHeatBelow(Ra_L,Pr);
                         else
                             clc;
-                            disp('Invalid selection.');
+                            warndlg('Invalid selection.');
                         end
                     case 2
-                        clc;
-                        disp('Free convect, enclosed, concentric cylinders');
-                    case 3
-                        clc;
-                        disp('Free convect, enclosed, concentric spheres');
-                    otherwise
-                        disp('Invalid selection.');
+                        warndlg('Nonrectangular cavities not yet supported.');
                 end
             otherwise
                 clc;
-                disp('Invalid selection.');
+                warndlg('Invalid selection.');
         end
 
     otherwise
-        disp('Invalid main selection.');
+        warndlg('Invalid main selection.');
 end
 
 %% Display results
@@ -554,7 +545,7 @@ function Pr = getPr(fluid, T_K)
 Pr = getFluidProp(fluid, T_K, 'pr');
 end
 
-function [Ra, T_s, T_inf, T_f, L] = getRa(fluid, ra_type)
+function [Ra, T_s, T_inf, T_f, L] = getRa(fluid, ra_type, T1, T2, L)
 % getRa Calculate Rayleigh number using Grashof number
 %   [Ra, T_s, T_inf] = getRa(fluid, ra_type)
 %
@@ -576,29 +567,32 @@ else
     charName = 'length (L)';
 end
 
-% Prompt user to select input method
-disp('Select Ra input method:');
-fprintf('   1. Compute from characteristic (%s)\n', charName);
-disp('   2. Direct input (Ra)');
-RaChoice = input('Ra input method: ');
-clc;
+if nargin < 4 || isempty(T1) || isempty(T2)
+    % Prompt user to select input method
+    disp('Select Ra input method:');
+    fprintf('   1. Compute from characteristic (%s)\n', charName);
+    disp('   2. Direct input (Ra)');
+    RaChoice = input('Ra input method: ');
+    clc;
 
-if RaChoice == 2
-    Ra = input('Enter Rayleigh number (Ra): ');
-    return
+    if RaChoice == 2
+        Ra = input('Enter Rayleigh number (Ra): ');
+        return
+    end
+    clc;
+    
+    % Prompt only if temps not passed in
+    T_s  = input('Enter surface temperature, T_s (C): ')+273.15;
+    T_inf = input('Enter ambient temperature, T_inf (C): ')+273.15;
+else
+    % Use the provided function inputs
+    T_s  = T1;
+    T_inf = T2;
 end
-clc;
 
-% Prompt for surface and ambient temperatures
-T_s = input('Enter surface temperature, T_s (C): ');
-T_inf = input('Enter ambient temperature, T_inf (C): ');
-
-T_s = T_s +273.15;
-T_inf = T_inf + 273.15;
-
-% Prompt for characteristic dimension
-L = input(sprintf('Enter characteristic %s (m): ', charName));
-
+if nargin < 5 || isempty(L)
+    L = input(sprintf('Enter characteristic %s (m): ', charName));
+end
 clc;
 
 T_f = mean([T_s T_inf]);
@@ -1272,8 +1266,8 @@ if Ra_L >= 10^4 && Ra_L <= 10^7 && Pr >= 0.7
 elseif Ra_L >= 10^7 && Ra_L <= 10^11
     Nu_L = 0.15*Ra_L.^(1/3);
 else
-    disp('Invalid combination of Ra_L and Pr');
-    Nu_L = NaN;
+    warndlg('HotUpper: Invalid combination of Ra_L and Pr');
+    Nu_L = 0.54*Ra_L.^(1/4);
 end
 end
 
@@ -1290,7 +1284,7 @@ function Nu_L = freeConvExtPlateHorizHotLower(Ra_L,Pr)
 if Ra_L >= 10^4 && Ra_L <= 10^9 && Pr >= 0.7
     Nu_L = 0.52*Ra_L.^(1/5);
 else
-    warndlg('Invalid combination of Ra_L and Pr');
+    warndlg('HotLower: Invalid combination of Ra_L and Pr');
     Nu_L = 0.52*Ra_L.^(1/5);
 end
 end
@@ -1307,7 +1301,7 @@ function Nu_D = freeConvExtHorizCyl(Ra_D,Pr)
 if Ra_D <= 10^12
     Nu_D = (0.60 + 0.387*Ra_D.^(1/6) ./(1+(0.559/Pr).^(9/16)).^(8/27)).^2;
 else
-    disp('Invalid combination of Ra_D and Pr');
+    warndlg('ExtCyl: Invalid combination of Ra_D and Pr');
     Nu_D = (0.60 + 0.387*Ra_D.^(1/6) ./(1+(0.559/Pr).^(9/16)).^(8/27)).^2;
 end
 end
@@ -1325,7 +1319,7 @@ function Nu_D = freeConvExtSphere(Ra_D,Pr)
 if Ra_D <= 10^12 && Pr >= 0.7
     Nu_D = 2 + 0.589*Ra_D.^(1/4) ./(1+(0.469/Pr).^(9/16)).^(4/9);
 else
-    disp('Invalid combination of Ra_D and Pr');
+    warndlg('ExtSph: Invalid combination of Ra_D and Pr');
     Nu_D = 2 + 0.589*Ra_D.^(1/4) ./(1+(0.469/Pr).^(9/16)).^(4/9);
 end
 end
@@ -1343,8 +1337,8 @@ function Nu_L = freeConvEncRectCavHorizHeatBelow(Ra_L,Pr)
 if Ra_L <= 7e9 && Ra_L >= 3e5
     Nu_L = 0.069*Ra_L^(1/3)*Pr^0.074;
 else
-    warndlg('Invalid combination of Ra_L and Pr');
     Nu_L = 0.069*Ra_L^(1/3)*Pr^0.074;
+    warndlg('HeatBel: Invalid combination of Ra_L and Pr');
 end
 end
 
@@ -1361,14 +1355,20 @@ function Nu_L = freeConvEncRectVertCav(Ra_L,Pr,H,L)
 
 if Ra_L*Pr/(0.2+Pr) >= 10^3   && H/L >= 1 && H/L <= 2   && Pr >= 10^-3 && Pr <= 10^5
     Nu_L = 0.18*(Pr/(0.2+Pr)*Ra_L)^0.29;
-elseif Ra_L <= 10^3 && Ra_L >= 10^10   && H/L >= 1 && H/L <= 10   && Pr <= 10^5
+elseif Ra_L >= 10^3 && Ra_L <= 10^10   && H/L >= 1 && H/L <= 10   && Pr <= 10^5
     Nu_L = 0.22*(Pr/(0.2+Pr)*Ra_L)^0.28*(H/L)^(-1/4);
-elseif Ra_L <= 10^6 && Ra_L >= 10^9   && H/L >= 1 && H/L <= 40   && Pr >= 1 && Pr <= 20
+elseif Ra_L >= 10^6 && Ra_L <= 10^9   && H/L >= 1 && H/L <= 40   && Pr >= 0.68 && Pr <= 20
     Nu_L = 0.046*Ra_L^(1/3);
-elseif Ra_L <= 10^4 && Ra_L >= 10^7   && H/L >= 10 && H/L <= 40   && Pr >= 1 && Pr <= 2e4
+    if Pr < 1
+        warndlg('freeConvVertCav: Pr < 1');
+    end
+elseif Ra_L >= 10^4 && Ra_L <= 10^7   && H/L >= 10 && H/L <= 40   && Pr >= 0.68 && Pr <= 2e4
     Nu_L = 0.42*Ra_L^0.25*Pr^0.012*(H/L)^-0.3;
+    if Pr < 1
+        warndlg('freeConvVertCav: Pr < 1');
+    end
 else
-    warndlg('Invalid combination of Ra_L and Pr');
+    warndlg('VertCav: Invalid combination of Ra_L and Pr');
     Nu_L = NaN;
 end
 end
