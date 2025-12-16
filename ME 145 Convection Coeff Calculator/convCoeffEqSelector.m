@@ -7,9 +7,9 @@
 %       - 63% of trials had less than 3% error, 96% had less than 5% error
 %       - Maximum error was 8% (free convection vertical plate)
 %   - Most problems can be input to the script within 45 sec (max 90 sec)
-%       - Most problems take ~ 12+ minutes to compute by hand
+%       - Most problems take ~ 20+ minutes to compute by hand
 %       - Tube bank problems can be entered within 90 sec 
-%           - Tube problems take ~ 30+ min to hand calc (per iteration)
+%           - Tube problems take ~ 2+ hours to hand calc
 
 clc; clear;
 Re_L = NaN; Re_D = NaN; Ra_L = NaN; Ra_D = NaN; L = NaN; D = NaN;
